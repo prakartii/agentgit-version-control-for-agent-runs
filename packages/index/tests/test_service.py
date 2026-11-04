@@ -55,3 +55,22 @@ def test_ref_can_be_created_and_moved(engine: Engine) -> None:
     index.set_ref("main", second)
     assert index.resolve_ref("main") == second
     assert index.resolve_ref("missing") is None
+
+
+def test_resolve_ref_full_id_and_prefix(engine: Engine) -> None:
+    repo = Repository(MemoryStore())
+    index = IndexService(engine, repo)
+    run_id = build_run(repo)
+    index.set_ref("main", run_id)
+    assert index.resolve("main") == run_id
+    assert index.resolve(run_id) == run_id
+    assert index.resolve(run_id[:8]) == run_id
+    assert index.resolve("zzzz") is None
+
+
+def test_wildcards_in_input_are_not_patterns(engine: Engine) -> None:
+    repo = Repository(MemoryStore())
+    index = IndexService(engine, repo)
+    index.index_run(build_run(repo))
+    assert index.resolve("%") is None
+    assert index.resolve("_") is None
