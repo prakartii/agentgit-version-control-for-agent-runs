@@ -69,3 +69,10 @@ def test_outcome_is_part_of_the_step_id() -> None:
     ok = Step(method="tools/call", tool_name="t")
     failed = Step(method="tools/call", tool_name="t", outcome="no_response")
     assert encode_step(ok)[0] != encode_step(failed)[0]
+
+
+def test_origin_defaults_to_client_and_is_part_of_the_id() -> None:
+    client = Step(method="sampling/createMessage")
+    server = Step(method="sampling/createMessage", origin="server")
+    assert client.origin == "client"
+    assert encode_step(client)[0] != encode_step(server)[0]
