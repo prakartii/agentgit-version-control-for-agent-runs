@@ -82,6 +82,27 @@ class IndexService:
         with Session(self._engine) as session:
             return session.scalar(select(RefRow.run_id).where(RefRow.name == name))
 
+    def resolve(self, name_or_prefix: str) -> str | None:
+        """Resolve a ref name, full id or unique id prefix to a run id.
+
+        Returns None if nothing matches. Raises ValueError if a prefix is
+        ambiguous, as git does.
+        """
+        ref = self.resolve_ref(name_or_prefix)
+        if ref is not None:
+            return ref
+        with Session(self._engine) as session:
+            # Escape LIKE wildcards so user input is matched literally.
+            escaped = (
+                name_or_prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            ids = session.scalars(
+                select(RunRow.id).where(RunRow.id.like(escaped + "%", escape="\\")).limit(2)
+            ).all()
+        if len(ids) > 1:
+            raise ValueError(f"ambiguous run id prefix: {name_or_prefix}")
+        return ids[0] if ids else None
+
     def list_runs(self, limit: int = 20) -> list[RunSummary]:
         """Most recently indexed runs first (the data behind ``agentgit log``)."""
         with Session(self._engine) as session:
