@@ -12,6 +12,7 @@ members = [
     "agentgit-cli",
     "agentgit-core",
     "agentgit-index",
+    "agentgit-proxy",
     "agentgit-workspace",
 ]
 
@@ -76,6 +77,21 @@ requires-dist = [
 ]
 
 [[package]]
+name = "agentgit-proxy"
+version = "0.0.0"
+source = { editable = "apps/proxy" }
+dependencies = [
+    { name = "agentgit-core" },
+    { name = "agentgit-index" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentgit-core", editable = "packages/core" },
+    { name = "agentgit-index", editable = "packages/index" },
+]
+
+[[package]]
 name = "agentgit-workspace"
 version = "0.0.0"
 source = { virtual = "." }
@@ -84,6 +100,7 @@ dependencies = [
     { name = "agentgit-cli" },
     { name = "agentgit-core" },
     { name = "agentgit-index" },
+    { name = "agentgit-proxy" },
 ]
 
 [package.dev-dependencies]
@@ -101,6 +118,7 @@ requires-dist = [
     { name = "agentgit-cli", editable = "apps/cli" },
     { name = "agentgit-core", editable = "packages/core" },
     { name = "agentgit-index", editable = "packages/index" },
+    { name = "agentgit-proxy", editable = "apps/proxy" },
 ]
 
 [package.metadata.requires-dev]
