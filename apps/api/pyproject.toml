@@ -3,10 +3,11 @@ name = "agentgit-api"
 version = "0.0.0"
 description = "AgentGit HTTP API"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115", "uvicorn>=0.30", "agentgit-core"]
+dependencies = ["fastapi>=0.115", "uvicorn>=0.30", "agentgit-core", "agentgit-index"]
 
 [tool.uv.sources]
 agentgit-core = { workspace = true }
+agentgit-index = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
