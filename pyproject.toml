@@ -45,3 +45,7 @@ addopts = "-ra --strict-markers"
 
 [tool.ruff.lint.isort]
 known-first-party = ["agentgit_core", "agentgit_api", "agentgit_cli", "agentgit_index"]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic's env.py must set up paths before imports; revisions are generated.
+"**/migrations/**" = ["E402", "E501"]
