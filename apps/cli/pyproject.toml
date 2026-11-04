@@ -1,0 +1,19 @@
+[project]
+name = "agentgit-cli"
+version = "0.0.0"
+description = "AgentGit command line interface"
+requires-python = ">=3.12"
+dependencies = ["typer>=0.12", "agentgit-core"]
+
+[project.scripts]
+agentgit = "agentgit_cli.main:app"
+
+[tool.uv.sources]
+agentgit-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentgit_cli"]
