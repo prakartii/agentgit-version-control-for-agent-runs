@@ -54,6 +54,8 @@ class SessionInfo:
 
 
 def _meta(body: Any) -> dict[str, Any]:
-    if isinstance(body, dict) and isinstance(body.get("_meta"), dict):
-        return body["_meta"]
+    if isinstance(body, dict):
+        meta = body.get("_meta")
+        if isinstance(meta, dict):
+            return meta
     return {}
