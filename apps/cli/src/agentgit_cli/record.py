@@ -43,7 +43,7 @@ def _say(message: str) -> None:
 
 
 def _build_session(
-    server: str, session_id: str | None, transport: str, redact: bool
+    server: str, session_id: str | None, transport: str, redact: bool, use_index: bool
 ) -> tuple[RecordingSession, Repository, IndexService]:
     home = Path(os.environ.get("AGENTGIT_HOME", ".agentgit"))
     repo = Repository(FilesystemStore(home / "objects"))
@@ -58,10 +58,15 @@ def _build_session(
         metadata["session_id"] = session_id
     # With redaction off, an empty rule set makes the redactor a no-op.
     redactor = Redactor() if redact else Redactor(rules=[], sensitive_keys=[])
-    return RecordingSession(repo, redactor=redactor, index=index, metadata=metadata), repo, index
+    session = RecordingSession(
+        repo, redactor=redactor, index=index if use_index else None, metadata=metadata
+    )
+    return session, repo, index
 
 
-def _report(result: RunResult, repo: Repository, index: IndexService, ref: str | None) -> None:
+def _report(
+    result: RunResult, repo: Repository, index: IndexService, ref: str | None, use_index: bool
+) -> None:
     if result.run_id is None:
         _say("ERROR: the run could not be stored; nothing was recorded")
         return
@@ -71,7 +76,11 @@ def _report(result: RunResult, repo: Repository, index: IndexService, ref: str |
         _say(f"WARNING: {result.dropped_steps} exchange(s) could not be stored")
     if run.redacted:
         _say("note: some recorded content was redacted")
-    if not result.indexed:
+    if not use_index:
+        _say("indexing skipped (--no-index); the run is stored in the object store")
+        if ref:
+            _say(f"WARNING: ref '{ref}' was not set because refs live in the index")
+    elif not result.indexed:
         _say("WARNING: the run is stored but not indexed (is Postgres running?)")
     elif ref:
         try:
@@ -104,6 +113,9 @@ def record(
     ] = None,
     ref: Annotated[str | None, typer.Option(help="Point this ref at the recorded run.")] = None,
     redact: Annotated[bool, typer.Option(help="Redact secrets in the recording.")] = True,
+    index: Annotated[
+        bool, typer.Option(help="Index the run in Postgres (objects are stored either way).")
+    ] = True,
 ) -> None:
     """Record an MCP session between an agent and a server."""
     if bool(command) == bool(upstream):
@@ -112,16 +124,16 @@ def record(
 
     if command:
         label = server_name or Path(command[0]).stem
-        session, repo, index = _build_session(label, session_id, "stdio", redact)
+        session, repo, index_service = _build_session(label, session_id, "stdio", redact, index)
         outcome = asyncio.run(
             run_stdio_proxy(command, process_stdin_chunks(), process_stdout_write, session)
         )
-        _report(outcome.run, repo, index, ref)
+        _report(outcome.run, repo, index_service, ref, index)
         raise typer.Exit(outcome.exit_code)
 
     assert upstream is not None
     label = server_name or upstream
-    session, repo, index = _build_session(label, session_id, "http", redact)
+    session, repo, index_service = _build_session(label, session_id, "http", redact, index)
     app = create_app(upstream, session)
     _say(f"listening on http://{host}:{port}/mcp -> {upstream} (Ctrl+C to stop and save the run)")
     with contextlib.suppress(KeyboardInterrupt):
@@ -130,7 +142,7 @@ def record(
     if result is None:
         _say("ERROR: the proxy stopped before the run could be saved")
         raise typer.Exit(1)
-    _report(result, repo, index, ref)
+    _report(result, repo, index_service, ref, index)
 
 
 def register(app: typer.Typer) -> None:
