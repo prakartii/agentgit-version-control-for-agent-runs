@@ -22,6 +22,9 @@ class RunSummary:
     parents: tuple[str, ...]
     step_count: int
     metadata: dict[str, str]
+    status: str = "complete"
+    redacted: bool = False
+    dropped_steps: int = 0
 
 
 class IndexService:
@@ -41,7 +44,14 @@ class IndexService:
             self._index(session, parent)
         session.execute(
             insert(RunRow)
-            .values(id=run_id, fork_step=run.fork_step, run_metadata=run.metadata)
+            .values(
+                id=run_id,
+                fork_step=run.fork_step,
+                run_metadata=run.metadata,
+                status=run.status,
+                redacted=run.redacted,
+                dropped_steps=run.dropped_steps,
+            )
             .on_conflict_do_nothing()
         )
         for position, step_id in enumerate(run.steps):
@@ -51,15 +61,24 @@ class IndexService:
                 .values(
                     id=step_id,
                     kind=step.kind,
+                    method=step.method,
+                    outcome=step.outcome,
                     tool_name=step.tool_name,
                     is_error=step.is_error,
                     duration_ms=step.duration_ms,
                 )
                 .on_conflict_do_nothing()
             )
+            timing = run.timings[position] if run.timings else None
             session.execute(
                 insert(RunStepRow)
-                .values(run_id=run_id, position=position, step_id=step_id)
+                .values(
+                    run_id=run_id,
+                    position=position,
+                    step_id=step_id,
+                    started_at_ms=timing.started_at_ms if timing else None,
+                    duration_ms=timing.duration_ms if timing else None,
+                )
                 .on_conflict_do_nothing()
             )
         for parent in run.parents:
@@ -122,4 +141,12 @@ class IndexService:
             select(RunParentRow.parent_id).where(RunParentRow.run_id == row.id)
         ).all()
         steps = session.scalars(select(RunStepRow.step_id).where(RunStepRow.run_id == row.id)).all()
-        return RunSummary(row.id, tuple(parents), len(steps), dict(row.run_metadata))
+        return RunSummary(
+            row.id,
+            tuple(parents),
+            len(steps),
+            dict(row.run_metadata),
+            row.status,
+            row.redacted,
+            row.dropped_steps,
+        )
