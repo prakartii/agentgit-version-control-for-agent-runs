@@ -12,20 +12,20 @@ def test_blob_id_is_content_addressed() -> None:
 
 
 def test_equal_steps_have_equal_ids() -> None:
-    a = Step(index=0, kind="tool_call", tool_name="read", arguments="x")
-    b = Step(index=0, kind="tool_call", tool_name="read", arguments="x")
+    a = Step(method="tools/call", tool_name="read", arguments="x")
+    b = Step(method="tools/call", tool_name="read", arguments="x")
     assert encode_step(a)[0] == encode_step(b)[0]
 
 
 def test_changing_a_field_changes_the_id() -> None:
-    a = Step(index=0, kind="tool_call", tool_name="read")
-    b = Step(index=0, kind="tool_call", tool_name="write")
+    a = Step(method="tools/call", tool_name="read")
+    b = Step(method="tools/call", tool_name="write")
     assert encode_step(a)[0] != encode_step(b)[0]
 
 
 def test_unknown_fields_are_rejected() -> None:
     with pytest.raises(ValidationError):
-        Step.model_validate({"index": 0, "kind": "tool_call", "bogus": 1})
+        Step.model_validate({"method": "tools/call", "bogus": 1})
 
 
 def test_metadata_key_order_does_not_change_run_id() -> None:

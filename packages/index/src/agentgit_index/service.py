@@ -60,12 +60,9 @@ class IndexService:
                 insert(StepRow)
                 .values(
                     id=step_id,
-                    kind=step.kind,
                     method=step.method,
                     outcome=step.outcome,
                     tool_name=step.tool_name,
-                    is_error=step.is_error,
-                    duration_ms=step.duration_ms,
                 )
                 .on_conflict_do_nothing()
             )

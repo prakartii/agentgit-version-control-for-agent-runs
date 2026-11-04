@@ -9,7 +9,7 @@ def make_run(repo: Repository, result: bytes = b"ok") -> tuple[str, str]:
     args = repo.put_blob(b'{"path": "a.txt"}')
     res = repo.put_blob(result)
     step_id = repo.put_step(
-        Step(index=0, kind="tool_call", tool_name="read", arguments=args, result=res)
+        Step(method="tools/call", tool_name="read", arguments=args, result=res)
     )
     return repo.put_run(Run(steps=(step_id,))), step_id
 
@@ -30,7 +30,7 @@ def test_identical_runs_dedup_to_one_id() -> None:
 def test_step_with_missing_blob_is_rejected() -> None:
     repo = Repository(MemoryStore())
     with pytest.raises(IntegrityError):
-        repo.put_step(Step(index=0, kind="tool_call", result="f" * 64))
+        repo.put_step(Step(method="tools/call", result="f" * 64))
 
 
 def test_run_with_missing_step_is_rejected() -> None:

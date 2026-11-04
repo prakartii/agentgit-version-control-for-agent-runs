@@ -76,6 +76,6 @@ def show(target: str = typer.Argument(..., help="Run id, unique id prefix, or re
         timing = run.timings[position] if run.timings else None
         took = f"{timing.duration_ms}ms" if timing else "-"
         typer.echo(
-            f"  [{position}] {step.method or step.kind} {step.tool_name or '-'} "
+            f"  [{position}] {step.method} {step.tool_name or '-'} "
             f"{step.outcome} {took}"
         )

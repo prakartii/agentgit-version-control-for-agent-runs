@@ -11,8 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from agentgit_core.hashing import canonical_json, hash_object
 
-StepKind = Literal["tool_listing", "tool_call"]
-
 # How an exchange ended. "tool_error" is a result with isError=true;
 # "protocol_error" is a JSON-RPC error response; "no_response" means the
 # request was seen but no reply arrived before the session ended.
@@ -25,18 +23,12 @@ class Step(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    # Legacy fields, removed once all readers use `method`/`outcome` (ADR-003).
-    index: int | None = Field(default=None, ge=0)
-    kind: StepKind | None = None
-    # Content fields (ADR-003).
-    method: str | None = None  # JSON-RPC method, e.g. "tools/call"
+    method: str  # JSON-RPC method, e.g. "tools/call"
     outcome: StepOutcome = "ok"
     events: str | None = None  # blob id of notifications seen during the request
     tool_name: str | None = None
     arguments: str | None = None  # blob id of the call arguments
     result: str | None = None  # blob id of the result (or error payload)
-    is_error: bool = False
-    duration_ms: int = Field(default=0, ge=0)
 
 
 class StepTiming(BaseModel):
@@ -52,7 +44,7 @@ class Run(BaseModel):
     """An ordered list of steps plus lineage.
 
     ``parents`` holds parent run ids (a fork has one). ``fork_step`` is the
-    step index in the parent where this run diverged.
+    step position in the parent where this run diverged.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

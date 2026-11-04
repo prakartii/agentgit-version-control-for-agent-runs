@@ -8,7 +8,7 @@ from agentgit_index.service import IndexService
 
 def build_run(repo: Repository, tool: str = "read", parent: str | None = None) -> str:
     result = repo.put_blob(tool.encode())
-    step = repo.put_step(Step(index=0, kind="tool_call", tool_name=tool, result=result))
+    step = repo.put_step(Step(method="tools/call", tool_name=tool, result=result))
     if parent is None:
         return repo.put_run(Run(steps=(step,), metadata={"agent": "demo"}))
     return repo.put_run(Run(steps=(step,), parents=(parent,), fork_step=0))
