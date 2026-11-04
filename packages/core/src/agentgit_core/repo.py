@@ -24,7 +24,7 @@ class Repository:
         return self._store.put("blob", data)
 
     def put_step(self, step: Step) -> str:
-        for ref in (step.arguments, step.result):
+        for ref in (step.arguments, step.result, step.events):
             if ref is not None and not self._store.has("blob", ref):
                 raise IntegrityError(f"step references missing blob {ref}")
         _, payload = encode_step(step)
@@ -83,7 +83,7 @@ class Repository:
             run = self.get_run(current)
             for step_id in run.steps:
                 step = self.get_step(step_id)
-                for blob in (step.arguments, step.result):
+                for blob in (step.arguments, step.result, step.events):
                     if blob is not None:
                         self.get_blob(blob)
             stack.extend(run.parents)
