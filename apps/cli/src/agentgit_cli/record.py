@@ -27,6 +27,7 @@ from agentgit_core.repo import Repository
 from agentgit_core.store import FilesystemStore
 from agentgit_index.service import IndexService
 from agentgit_proxy.http_proxy import create_app, serve
+from agentgit_proxy.journal import Journal, recover, unrecovered_journals
 from agentgit_proxy.redaction import Redactor
 from agentgit_proxy.sink import RecordingSession, RunResult
 from agentgit_proxy.stdio_proxy import (
@@ -40,6 +41,10 @@ SHORT_ID = 12
 
 def _say(message: str) -> None:
     typer.echo(f"agentgit: {message}", err=True)
+
+
+def _journal_dir() -> Path:
+    return Path(os.environ.get("AGENTGIT_HOME", ".agentgit")) / "journal"
 
 
 def _build_session(
@@ -59,7 +64,11 @@ def _build_session(
     # With redaction off, an empty rule set makes the redactor a no-op.
     redactor = Redactor() if redact else Redactor(rules=[], sensitive_keys=[])
     session = RecordingSession(
-        repo, redactor=redactor, index=index if use_index else None, metadata=metadata
+        repo,
+        redactor=redactor,
+        index=index if use_index else None,
+        metadata=metadata,
+        journal=Journal(_journal_dir()),
     )
     return session, repo, index
 
@@ -88,6 +97,42 @@ def _report(
             _say(f"ref '{ref}' -> {result.run_id[:SHORT_ID]}")
         except Exception as exc:
             _say(f"WARNING: could not set ref '{ref}': {exc}")
+
+
+def _warn_about_unrecovered() -> None:
+    """Say so if an earlier session died without saving its run."""
+    pending = unrecovered_journals(_journal_dir())
+    if pending:
+        _say(
+            f"note: {len(pending)} earlier recording(s) did not finish; "
+            "run `agentgit recover` to save what they captured"
+        )
+
+
+def recover_command(
+    index: Annotated[bool, typer.Option(help="Index recovered runs in Postgres.")] = True,
+) -> None:
+    """Save the runs of recording sessions that were killed before they finished."""
+    home = Path(os.environ.get("AGENTGIT_HOME", ".agentgit"))
+    repo = Repository(FilesystemStore(home / "objects"))
+    index_service = None
+    if index:
+        engine = create_engine(
+            os.environ.get("DATABASE_URL", DEFAULT_DB), connect_args={"connect_timeout": 3}
+        )
+        index_service = IndexService(engine, repo)
+    results = recover(_journal_dir(), repo, index_service)
+    if not results:
+        typer.echo("nothing to recover")
+        return
+    for r in results:
+        if r.run_id is None:
+            typer.echo(f"FAILED  {r.journal.name}: {r.note} (journal kept)")
+        elif r.note == "already closed":
+            typer.echo(f"already saved as {r.run_id[:SHORT_ID]}  ({r.journal.name} removed)")
+        else:
+            flag = "" if r.indexed or not index else "  [not indexed]"
+            typer.echo(f"recovered {r.run_id[:SHORT_ID]}  {r.steps} steps, aborted{flag}")
 
 
 def record(
@@ -121,6 +166,7 @@ def record(
     if bool(command) == bool(upstream):
         _say("give either a server command after `--` (stdio) or --upstream URL (HTTP)")
         raise typer.Exit(2)
+    _warn_about_unrecovered()
 
     if command:
         label = server_name or Path(command[0]).stem
@@ -147,3 +193,4 @@ def record(
 
 def register(app: typer.Typer) -> None:
     app.command("record")(record)
+    app.command("recover")(recover_command)
