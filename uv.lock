@@ -38,12 +38,14 @@ version = "0.0.0"
 source = { editable = "apps/cli" }
 dependencies = [
     { name = "agentgit-core" },
+    { name = "agentgit-index" },
     { name = "typer" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "agentgit-core", editable = "packages/core" },
+    { name = "agentgit-index", editable = "packages/index" },
     { name = "typer", specifier = ">=0.12" },
 ]
 
