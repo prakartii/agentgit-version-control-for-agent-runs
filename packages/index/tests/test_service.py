@@ -74,3 +74,37 @@ def test_wildcards_in_input_are_not_patterns(engine: Engine) -> None:
     index.index_run(build_run(repo))
     assert index.resolve("%") is None
     assert index.resolve("_") is None
+
+
+def test_index_stores_outcome_timings_and_completeness(engine: Engine) -> None:
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from agentgit_core.objects import StepTiming
+    from agentgit_index.models import RunStepRow, StepRow
+
+    repo = Repository(MemoryStore())
+    index = IndexService(engine, repo)
+    args = repo.put_blob(b"{}")
+    step = repo.put_step(
+        Step(method="tools/call", tool_name="read", arguments=args, outcome="no_response")
+    )
+    run_id = repo.put_run(
+        Run(
+            steps=(step,),
+            timings=(StepTiming(started_at_ms=1000, duration_ms=25),),
+            status="aborted",
+            redacted=True,
+            dropped_steps=2,
+        )
+    )
+    index.index_run(run_id)
+
+    summary = index.get_run(run_id)
+    assert summary is not None
+    assert (summary.status, summary.redacted, summary.dropped_steps) == ("aborted", True, 2)
+    with Session(engine) as session:
+        row = session.get(StepRow, step)
+        assert row is not None and (row.method, row.outcome) == ("tools/call", "no_response")
+        timing = session.scalars(select(RunStepRow).where(RunStepRow.run_id == run_id)).one()
+        assert (timing.started_at_ms, timing.duration_ms) == (1000, 25)
