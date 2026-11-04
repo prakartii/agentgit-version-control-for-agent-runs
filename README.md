@@ -16,6 +16,9 @@ Working today:
   redaction on the recorded copy and explicit completeness flags
 - Two demo MCP servers, and integration tests that drive the official SDK
   client through the proxy
+- **Two demo agents** (coding, support) with a hand-written loop and
+  Pydantic-validated tool calls, a provider-neutral LLM interface with response
+  caching and cost logging, and `agentgit-agent` to run them
 
 Not built yet: replay, fork, diff, Agent CI, chaos testing, UI.
 See [docs/architecture.md](docs/architecture.md) for the design and the
@@ -72,12 +75,29 @@ Nothing the proxy does changes the traffic the agent and server see; secrets
 are redacted only in what is stored. Redaction is best-effort, so treat
 `.agentgit/` as sensitive.
 
+## Running a demo agent
+
+The agents need a model. With an Anthropic key in `ANTHROPIC_API_KEY`:
+
+```
+uv run agentgit-agent run support "Handle the double-charge ticket" --record     -- uv run agentgit-demo-tickets
+uv run agentgit log
+```
+
+`--record` starts the tool server through `agentgit record`; the agent is the
+same with or without it. Model responses are cached in `.agentgit/llm_cache`,
+and `--cache-mode replay` re-runs the agent with no network and no model calls.
+Dollar costs are shown only if you pass `--input-price` and `--output-price`
+(USD per million tokens); otherwise they are reported as unknown. The Claude
+provider has been tested against the SDK's types, not the live API.
+
 ## Layout
 
 - `packages/core`: object model, hashing, object store
 - `packages/index`: Postgres index and migrations
 - `apps/proxy`: recording proxy (stdio and HTTP)
 - `packages/demo_servers`: demo MCP servers
+- `packages/agents`: demo agents, agent loop, LLM interface and cache
 - `apps/api`: FastAPI service (`/health`, `/runs`)
 - `apps/cli`: `agentgit` command
 - `docs/adr`: design decisions; `docs/architecture.md`, `docs/recording-format.md`

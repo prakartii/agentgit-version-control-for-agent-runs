@@ -37,6 +37,7 @@ agent (any framework)
 | `apps/cli` | `agentgit` command: `record`, `recover`, `log`, `show` |
 | `apps/api` | Read-only HTTP API over the index |
 | `packages/demo_servers` | Two tiny MCP servers for demos and tests |
+| `packages/agents` | Hand-written agent loop, the coding and support agents, the LLM interface (Claude provider, response cache, cost log) |
 
 ## Object model
 
@@ -78,6 +79,16 @@ The object store is the source of truth; Postgres is a rebuildable index
    produce several runs sharing a `--session` id; stitching them is a replay
    concern.
 
+## Agents and the LLM interface (ADR-005)
+
+The agent loop (`packages/agents/loop.py`) validates each proposed tool call
+against a Pydantic model, runs tools sequentially, and reports every failure as
+data. Model calls go through `LLMClient`; `CachingLLM` adds response caching
+(`readwrite`, `record`, `replay`) and cost logging. Because the same scripted
+or cached model outputs and the same tool results give the same step ids, an
+agent run repeated twice produces an identical sequence of recorded steps (a
+test pins this down).
+
 ## Replay and fork: what is exact and what is not
 
 The proxy sees only the tool side of an agent. Calls from the agent to its LLM
@@ -90,8 +101,8 @@ run metadata keep them apart:
 | Tool-side replay | from the recording | live | approximate; the model may choose differently, divergence is reported |
 | Fork / live re-execution (edited tool result or prompt at step N) | steps before N replayed, then live | live | approximate; runs are stamped as such |
 
-Only recording exists today. Strict replay additionally needs model calls to be
-captured, which is planned with the LLM interface.
+Only recording exists today. The model-output half now exists as the response
+cache (`replay` mode); connecting it to recorded runs is the replay phase.
 
 ## Known limitations
 
