@@ -8,7 +8,10 @@ every tool call and result. Recordings are stored like git objects
 
 ## Status
 
-Phase 0 (foundations) in progress. Nothing is usable yet.
+Phase 1 (object model and storage) done: content-addressed objects, a
+Postgres index, `agentgit log` / `show` and a read-only query API. Recording
+(Phase 2) is not built yet, so there is nothing to record into the store
+from the command line.
 
 ## Quickstart
 
@@ -20,12 +23,14 @@ uv run pytest
 uv run agentgit version
 uv run uvicorn agentgit_api.main:app   # GET /health
 docker compose up -d                   # Postgres on :5433
+DATABASE_URL=postgresql+psycopg://agentgit:agentgit@localhost:5433/agentgit   uv run --directory packages/index alembic upgrade head
 ```
 
 ## Layout
 
 - `packages/core`: object model, hashing, diff
-- `apps/api`: FastAPI service
+- `packages/index`: Postgres index and migrations
+- `apps/api`: FastAPI service (`/health`, `/runs`)
 - `apps/cli`: `agentgit` command
 - `docs/adr`: design decisions
 
