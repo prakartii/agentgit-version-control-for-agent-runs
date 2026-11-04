@@ -3,7 +3,7 @@ name = "agentgit-cli"
 version = "0.0.0"
 description = "AgentGit command line interface"
 requires-python = ">=3.12"
-dependencies = ["typer>=0.12", "agentgit-core", "agentgit-index"]
+dependencies = ["typer>=0.12", "agentgit-core", "agentgit-index", "agentgit-proxy"]
 
 [project.scripts]
 agentgit = "agentgit_cli.main:app"
@@ -11,6 +11,7 @@ agentgit = "agentgit_cli.main:app"
 [tool.uv.sources]
 agentgit-core = { workspace = true }
 agentgit-index = { workspace = true }
+agentgit-proxy = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

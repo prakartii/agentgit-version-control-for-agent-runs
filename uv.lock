@@ -42,6 +42,7 @@ source = { editable = "apps/cli" }
 dependencies = [
     { name = "agentgit-core" },
     { name = "agentgit-index" },
+    { name = "agentgit-proxy" },
     { name = "typer" },
 ]
 
@@ -49,6 +50,7 @@ dependencies = [
 requires-dist = [
     { name = "agentgit-core", editable = "packages/core" },
     { name = "agentgit-index", editable = "packages/index" },
+    { name = "agentgit-proxy", editable = "apps/proxy" },
     { name = "typer", specifier = ">=0.12" },
 ]
 
