@@ -2,7 +2,7 @@
 name = "agentgit-workspace"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = ["agentgit-core", "agentgit-api", "agentgit-cli"]
+dependencies = ["agentgit-core", "agentgit-api", "agentgit-cli", "agentgit-index"]
 
 [tool.uv]
 package = false
@@ -11,6 +11,7 @@ package = false
 agentgit-core = { workspace = true }
 agentgit-api = { workspace = true }
 agentgit-cli = { workspace = true }
+agentgit-index = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*", "apps/*"]
@@ -30,7 +31,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 warn_unused_ignores = true
 explicit_package_bases = true
-mypy_path = ["packages/core/src", "apps/api/src", "apps/cli/src"]
+mypy_path = ["packages/core/src", "apps/api/src", "apps/cli/src", "packages/index/src"]
 
 # Strict on core packages; relaxed elsewhere until they stabilise.
 [[tool.mypy.overrides]]
@@ -43,4 +44,4 @@ addopts = "-ra --strict-markers"
 
 
 [tool.ruff.lint.isort]
-known-first-party = ["agentgit_core", "agentgit_api", "agentgit_cli"]
+known-first-party = ["agentgit_core", "agentgit_api", "agentgit_cli", "agentgit_index"]
