@@ -31,3 +31,8 @@ mypy_path = ["packages/core/src", "apps/api/src", "apps/cli/src"]
 [[tool.mypy.overrides]]
 module = ["agentgit_core.*"]
 strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "apps"]
+addopts = "-ra --strict-markers"
+
