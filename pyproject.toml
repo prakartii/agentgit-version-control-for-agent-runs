@@ -20,3 +20,14 @@ target-version = "py312"
 [tool.ruff.lint]
 # E/F: pycodestyle+pyflakes, I: isort, B: bugbear, UP: pyupgrade, SIM: simplify
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+explicit_package_bases = true
+mypy_path = ["packages/core/src", "apps/api/src", "apps/cli/src"]
+
+# Strict on core packages; relaxed elsewhere until they stabilise.
+[[tool.mypy.overrides]]
+module = ["agentgit_core.*"]
+strict = true
