@@ -40,3 +40,6 @@ strict = true
 testpaths = ["packages", "apps"]
 addopts = "-ra --strict-markers"
 
+
+[tool.ruff.lint.isort]
+known-first-party = ["agentgit_core", "agentgit_api", "agentgit_cli"]
