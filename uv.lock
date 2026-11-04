@@ -21,6 +21,7 @@ version = "0.0.0"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "agentgit-core" },
+    { name = "agentgit-index" },
     { name = "fastapi" },
     { name = "uvicorn" },
 ]
@@ -28,6 +29,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "agentgit-core", editable = "packages/core" },
+    { name = "agentgit-index", editable = "packages/index" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
