@@ -242,3 +242,68 @@ def test_slow_index_does_not_hold_up_the_end_of_the_session() -> None:
     result, waited = asyncio.run(go())
     assert result.run_id is not None and result.indexed is False
     assert waited < 0.9  # close() returned without waiting for the slow index
+
+
+# ---- journal integration ---------------------------------------------------------
+
+
+def test_graceful_close_leaves_no_journal(tmp_path: Any) -> None:
+    from agentgit_proxy.journal import Journal, journals_in
+
+    repo = Repository(MemoryStore())
+    result = record(RecordingSession(repo, journal=Journal(tmp_path)), [exchange(0)])
+    assert result.run_id is not None
+    assert journals_in(tmp_path) == []
+
+
+def test_crash_before_close_is_recoverable_from_the_journal(tmp_path: Any) -> None:
+    from agentgit_proxy.journal import Journal, recover
+
+    repo = Repository(MemoryStore())
+    journal = Journal(tmp_path)
+    secret = "sk-abcdefghijklmnop1234"
+    ex = exchange(1, response={"content": [{"type": "text", "text": secret}]})
+    ex.params["_meta"][RESERVED + "protocolVersion"] = "2026-07-28"
+
+    async def crash() -> None:
+        session = RecordingSession(repo, journal=journal, metadata={"server": "files"})
+        await session.start()
+        session.submit(exchange(2, name="later"))
+        session.submit(ex)
+        session.submit(exchange(0, name="earlier"))
+        await asyncio.sleep(0.5)  # let the sink persist, then "die": no close()
+        journal.release()  # the OS would drop the lock when the process disappears
+
+    asyncio.run(crash())
+
+    (recovery,) = recover(tmp_path, repo)
+    run = repo.get_run(recovery.run_id)  # type: ignore[arg-type]
+    assert len(run.steps) == 3 and run.status == "aborted"
+    assert run.redacted is True  # the redaction flag survived the crash
+    assert run.metadata["server"] == "files"
+    assert run.metadata["protocol_version"] == "2026-07-28"
+    assert run.metadata["recovered_from_journal"] == "true"
+    assert [t.started_at_ms for t in run.timings] == sorted(t.started_at_ms for t in run.timings)
+
+
+def test_failed_run_write_keeps_the_journal_for_recovery(tmp_path: Any) -> None:
+    from agentgit_proxy.journal import Journal, journals_in, recover
+
+    class OnceFailingRuns(MemoryStore):
+        fail = True
+
+        def put(self, object_type: str, payload: bytes) -> str:
+            if object_type == "run" and self.fail:
+                raise OSError("disk full")
+            return super().put(object_type, payload)
+
+    store = OnceFailingRuns()
+    repo = Repository(store)
+    result = record(RecordingSession(repo, journal=Journal(tmp_path)), [exchange(0)])
+    assert result.run_id is None
+    assert len(journals_in(tmp_path)) == 1  # not deleted: the steps are still reachable
+
+    store.fail = False  # the disk problem is fixed
+    (recovery,) = recover(tmp_path, repo)
+    assert recovery.run_id is not None and recovery.steps == 1
+    assert journals_in(tmp_path) == []
