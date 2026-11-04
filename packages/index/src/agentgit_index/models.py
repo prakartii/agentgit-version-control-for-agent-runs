@@ -37,12 +37,9 @@ class StepRow(Base):
     __tablename__ = "steps"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    kind: Mapped[str | None] = mapped_column(String(32))  # legacy, see ADR-003
-    method: Mapped[str | None] = mapped_column(String(128))
+    method: Mapped[str] = mapped_column(String(128))
     outcome: Mapped[str] = mapped_column(String(16), default="ok", server_default="ok")
     tool_name: Mapped[str | None] = mapped_column(String(256))
-    is_error: Mapped[bool] = mapped_column(Boolean, default=False)
-    duration_ms: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
 class RunStepRow(Base):
