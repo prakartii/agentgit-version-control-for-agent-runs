@@ -1,12 +1,14 @@
 import typer
 
 from agentgit_cli.context import load_services
+from agentgit_cli.record import register as register_record
 from agentgit_core import __version__
 from agentgit_core.store import ObjectNotFoundError
 
 app = typer.Typer(help="Version control for AI agent runs.", no_args_is_help=True)
 
 SHORT_ID = 12
+register_record(app)
 
 
 @app.callback()
@@ -75,7 +77,4 @@ def show(target: str = typer.Argument(..., help="Run id, unique id prefix, or re
         step = services.repo.get_step(step_id)
         timing = run.timings[position] if run.timings else None
         took = f"{timing.duration_ms}ms" if timing else "-"
-        typer.echo(
-            f"  [{position}] {step.method} {step.tool_name or '-'} "
-            f"{step.outcome} {took}"
-        )
+        typer.echo(f"  [{position}] {step.method} {step.tool_name or '-'} {step.outcome} {took}")
