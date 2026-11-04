@@ -8,10 +8,18 @@ every tool call and result. Recordings are stored like git objects
 
 ## Status
 
-Phase 1 (object model and storage) done: content-addressed objects, a
-Postgres index, `agentgit log` / `show` and a read-only query API. Recording
-(Phase 2) is not built yet, so there is nothing to record into the store
-from the command line.
+Working today:
+
+- Content-addressed object store, Postgres index, `agentgit log` / `show`
+- **Recording proxy** for MCP over stdio and Streamable HTTP (`agentgit record`)
+  that forwards traffic unchanged and records every exchange, with secret
+  redaction on the recorded copy and explicit completeness flags
+- Two demo MCP servers, and integration tests that drive the official SDK
+  client through the proxy
+
+Not built yet: replay, fork, diff, Agent CI, chaos testing, UI.
+See [docs/architecture.md](docs/architecture.md) for the design and the
+known limitations.
 
 ## Quickstart
 
@@ -26,13 +34,50 @@ docker compose up -d                   # Postgres on :5433
 DATABASE_URL=postgresql+psycopg://agentgit:agentgit@localhost:5433/agentgit   uv run --directory packages/index alembic upgrade head
 ```
 
+## Recording a session
+
+Replace an agent's MCP server command with `agentgit record -- <the command>`.
+In an MCP client config that looks like:
+
+```json
+{
+  "mcpServers": {
+    "files": {
+      "command": "agentgit",
+      "args": ["record", "--session", "my-run", "--", "uv", "run", "agentgit-demo-files"]
+    }
+  }
+}
+```
+
+For a server that is already running over HTTP, point the agent at the proxy
+instead (Ctrl+C stops it and saves the run):
+
+```
+uv run agentgit record --upstream http://localhost:9000/mcp --port 8765
+```
+
+Then inspect it:
+
+```
+uv run agentgit log
+uv run agentgit show <run id prefix>
+```
+
+Add `--no-index` to skip Postgres (runs are still stored in `.agentgit/objects`).
+Nothing the proxy does changes the traffic the agent and server see; secrets
+are redacted only in what is stored. Redaction is best-effort, so treat
+`.agentgit/` as sensitive.
+
 ## Layout
 
-- `packages/core`: object model, hashing, diff
+- `packages/core`: object model, hashing, object store
 - `packages/index`: Postgres index and migrations
+- `apps/proxy`: recording proxy (stdio and HTTP)
+- `packages/demo_servers`: demo MCP servers
 - `apps/api`: FastAPI service (`/health`, `/runs`)
 - `apps/cli`: `agentgit` command
-- `docs/adr`: design decisions
+- `docs/adr`: design decisions; `docs/architecture.md`, `docs/recording-format.md`
 
 ## Planned features
 
