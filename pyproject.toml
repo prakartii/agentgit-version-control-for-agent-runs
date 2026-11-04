@@ -2,13 +2,14 @@
 name = "agentgit-workspace"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = ["agentgit-core"]
+dependencies = ["agentgit-core", "agentgit-api"]
 
 [tool.uv]
 package = false
 
 [tool.uv.sources]
 agentgit-core = { workspace = true }
+agentgit-api = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*", "apps/*"]

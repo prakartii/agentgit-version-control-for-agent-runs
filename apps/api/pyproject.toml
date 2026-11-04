@@ -1,0 +1,16 @@
+[project]
+name = "agentgit-api"
+version = "0.0.0"
+description = "AgentGit HTTP API"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115", "agentgit-core"]
+
+[tool.uv.sources]
+agentgit-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentgit_api"]
