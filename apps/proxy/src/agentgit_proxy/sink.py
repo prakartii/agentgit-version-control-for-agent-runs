@@ -26,6 +26,7 @@ from agentgit_proxy.redaction import Redactor
 log = logging.getLogger("agentgit.proxy")
 
 DEFAULT_QUEUE_SIZE = 10_000
+DEFAULT_INDEX_TIMEOUT = 10.0
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class RecordingSession:
     index: IndexService | None = None
     metadata: dict[str, str] = field(default_factory=dict)
     queue_size: int = DEFAULT_QUEUE_SIZE
+    index_timeout: float = DEFAULT_INDEX_TIMEOUT  # seconds; indexing is best-effort
 
     def __post_init__(self) -> None:
         self._queue: asyncio.Queue[Exchange | None] = asyncio.Queue(self.queue_size)
@@ -164,8 +166,12 @@ class RecordingSession:
         indexed = False
         if self.index is not None:
             try:
-                await asyncio.to_thread(self.index.index_run, run_id)
+                await asyncio.wait_for(
+                    asyncio.to_thread(self.index.index_run, run_id), self.index_timeout
+                )
                 indexed = True
+            except TimeoutError:
+                log.warning("indexing run %s timed out (objects are stored)", run_id)
             except Exception:
                 log.exception("failed to index run %s (objects are stored)", run_id)
         return RunResult(run_id, indexed, self._dropped)
