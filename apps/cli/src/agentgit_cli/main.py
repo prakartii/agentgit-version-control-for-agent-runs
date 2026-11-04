@@ -20,13 +20,26 @@ def version() -> None:
     typer.echo(__version__)
 
 
+def _completeness_flags(status: str, redacted: bool, dropped: int) -> str:
+    """Make incomplete or altered recordings visible instead of implied."""
+    flags = []
+    if status != "complete":
+        flags.append(f"[{status.upper()}]")
+    if dropped:
+        flags.append(f"[{dropped} DROPPED]")
+    if redacted:
+        flags.append("[REDACTED]")
+    return " ".join(flags)
+
+
 @app.command()
 def log(limit: int = typer.Option(20, "--limit", "-n", help="Max runs to show.")) -> None:
     """List recorded runs, newest first."""
     for run in load_services().index.list_runs(limit):
         parents = ",".join(p[:SHORT_ID] for p in run.parents) or "-"
         meta = " ".join(f"{k}={v}" for k, v in sorted(run.metadata.items()))
-        line = f"{run.id[:SHORT_ID]}  steps={run.step_count}  parents={parents}  {meta}"
+        flags = _completeness_flags(run.status, run.redacted, run.dropped_steps)
+        line = f"{run.id[:SHORT_ID]}  steps={run.step_count}  parents={parents}  {meta} {flags}"
         typer.echo(line.rstrip())
 
 
@@ -52,10 +65,17 @@ def show(target: str = typer.Argument(..., help="Run id, unique id prefix, or re
         typer.echo(f"forked from {', '.join(run.parents)} at step {run.fork_step}")
     for key, value in sorted(run.metadata.items()):
         typer.echo(f"{key}: {value}")
+    typer.echo(f"status: {run.status}")
+    if run.dropped_steps:
+        typer.echo(f"warning: {run.dropped_steps} exchange(s) were not recorded (storage errors)")
+    if run.redacted:
+        typer.echo("note: some recorded content was redacted")
     typer.echo("")
-    for step_id in run.steps:
+    for position, step_id in enumerate(run.steps):
         step = services.repo.get_step(step_id)
-        status = "error" if step.is_error else "ok"
+        timing = run.timings[position] if run.timings else None
+        took = f"{timing.duration_ms}ms" if timing else "-"
         typer.echo(
-            f"  [{step.index}] {step.kind} {step.tool_name or '-'} {status} {step.duration_ms}ms"
+            f"  [{position}] {step.method or step.kind} {step.tool_name or '-'} "
+            f"{step.outcome} {took}"
         )
