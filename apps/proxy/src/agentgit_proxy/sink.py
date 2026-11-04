@@ -20,6 +20,7 @@ from agentgit_core.objects import Run, RunStatus, Step, StepTiming
 from agentgit_core.repo import Repository
 from agentgit_index.service import IndexService
 from agentgit_proxy.correlator import Exchange, Stats
+from agentgit_proxy.journal import Journal
 from agentgit_proxy.normalize import SessionInfo, filter_meta
 from agentgit_proxy.redaction import Redactor
 
@@ -51,6 +52,7 @@ class RecordingSession:
     metadata: dict[str, str] = field(default_factory=dict)
     queue_size: int = DEFAULT_QUEUE_SIZE
     index_timeout: float = DEFAULT_INDEX_TIMEOUT  # seconds; indexing is best-effort
+    journal: Journal | None = None  # lets a hard-killed session be recovered
 
     def __post_init__(self) -> None:
         self._queue: asyncio.Queue[Exchange | None] = asyncio.Queue(self.queue_size)
@@ -60,19 +62,22 @@ class RecordingSession:
         self._dropped = 0
         self._redacted = False
         self._closed = False
+        self._journaled_meta: dict[str, str] = {}
 
     async def start(self) -> None:
+        if self.journal is not None:
+            self.journal.open(self.metadata)
         self._task = asyncio.create_task(self._consume(), name="agentgit-sink")
 
     # -- hot path: called while forwarding, must be cheap and safe ---------
     def submit(self, exchange: Exchange) -> None:
         if self._closed:
-            self._dropped += 1
+            self._drop()
             return
         try:
             self._queue.put_nowait(exchange)
         except Exception:  # queue full, or the session was already closed
-            self._dropped += 1
+            self._drop()
             log.warning("recording queue full or closed; dropped one exchange")
 
     # -- background persistence ----------------------------------------------
@@ -85,7 +90,7 @@ class RecordingSession:
                 # Blocking storage calls run in a thread, off the event loop.
                 await asyncio.to_thread(self._persist, exchange)
             except Exception:
-                self._dropped += 1
+                self._drop()
                 log.exception("failed to record an exchange; continuing")
 
     def _persist(self, ex: Exchange) -> None:
@@ -96,8 +101,10 @@ class RecordingSession:
         events = self.redactor.redact(
             [{"method": e["method"], "params": filter_meta(e["params"])} for e in ex.events]
         )
-        if self.redactor.replacements != before:
+        if self.redactor.replacements != before and not self._redacted:
             self._redacted = True
+            if self.journal is not None:
+                self.journal.mark("redacted")
 
         tool_name = None
         if ex.method == "tools/call" and isinstance(params, dict):
@@ -114,13 +121,21 @@ class RecordingSession:
             events=self._blob(events) if events else None,
         )
         step_id = self.repo.put_step(step)
-        self._stored.append(
-            _Stored(
-                ex.seq,
-                step_id,
-                StepTiming(started_at_ms=ex.started_at_ms, duration_ms=ex.duration_ms),
-            )
-        )
+        timing = StepTiming(started_at_ms=ex.started_at_ms, duration_ms=ex.duration_ms)
+        self._stored.append(_Stored(ex.seq, step_id, timing))
+        # Journal only after the step is safely stored, so a journaled id always exists.
+        if self.journal is not None:
+            self.journal.step(ex.seq, step_id, timing)
+            for key, value in self._session_metadata(None).items():
+                if self._journaled_meta.get(key) != value:
+                    self._journaled_meta[key] = value
+                    self.journal.meta(key, value)
+
+    def _drop(self) -> None:
+        """Count an exchange that could not be recorded (also in the journal)."""
+        self._dropped += 1
+        if self.journal is not None:
+            self.journal.mark("dropped")
 
     def _blob(self, value: Any) -> str:
         return self.repo.put_blob(canonical_json(value))
@@ -144,7 +159,8 @@ class RecordingSession:
                 log.warning("recording did not drain before the timeout")
                 self._task.cancel()
                 # Whatever was still queued is lost; say so.
-                self._dropped += self._queue.qsize()
+                for _ in range(self._queue.qsize()):
+                    self._drop()
 
         ordered = sorted(self._stored, key=lambda s: s.seq)
         metadata = dict(self.metadata)
@@ -162,7 +178,11 @@ class RecordingSession:
             run_id = await asyncio.to_thread(self.repo.put_run, run)
         except Exception:
             log.exception("failed to store the run object")
+            if self.journal is not None:
+                self.journal.release()  # keep the journal on disk so `recover` can retry
             return RunResult(None, False, self._dropped)
+        if self.journal is not None:
+            self.journal.close(run_id)  # the run is safe; the journal is no longer needed
         indexed = False
         if self.index is not None:
             try:
