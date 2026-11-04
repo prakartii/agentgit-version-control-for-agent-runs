@@ -18,14 +18,18 @@ class RunOut(BaseModel):
     parents: list[str]
     step_count: int
     metadata: dict[str, str]
+    status: str
+    redacted: bool
+    dropped_steps: int
 
 
 class StepOut(BaseModel):
-    index: int
-    kind: str
+    position: int
+    method: str | None
     tool_name: str | None
-    is_error: bool
-    duration_ms: int
+    outcome: str
+    started_at_ms: int | None
+    duration_ms: int | None
 
 
 class RunDetail(RunOut):
@@ -39,7 +43,15 @@ def list_runs(
     limit: Annotated[int, Query(ge=1, le=200)] = 20,
 ) -> list[RunOut]:
     return [
-        RunOut(id=r.id, parents=list(r.parents), step_count=r.step_count, metadata=r.metadata)
+        RunOut(
+            id=r.id,
+            parents=list(r.parents),
+            step_count=r.step_count,
+            metadata=r.metadata,
+            status=r.status,
+            redacted=r.redacted,
+            dropped_steps=r.dropped_steps,
+        )
         for r in index.list_runs(limit)
     ]
 
@@ -67,15 +79,19 @@ def get_run(
         parents=list(run.parents),
         step_count=len(steps),
         metadata=run.metadata,
+        status=run.status,
+        redacted=run.redacted,
+        dropped_steps=run.dropped_steps,
         fork_step=run.fork_step,
         steps=[
             StepOut(
-                index=s.index,
-                kind=s.kind,
+                position=i,
+                method=s.method,
                 tool_name=s.tool_name,
-                is_error=s.is_error,
-                duration_ms=s.duration_ms,
+                outcome=s.outcome,
+                started_at_ms=run.timings[i].started_at_ms if run.timings else None,
+                duration_ms=run.timings[i].duration_ms if run.timings else None,
             )
-            for s in steps
+            for i, s in enumerate(steps)
         ],
     )
