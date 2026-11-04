@@ -64,6 +64,9 @@ uv run agentgit log
 uv run agentgit show <run id prefix>
 ```
 
+If a recording process is killed before it can save its run, run
+`uv run agentgit recover` to rebuild it from the journal (see ADR-004).
+
 Add `--no-index` to skip Postgres (runs are still stored in `.agentgit/objects`).
 Nothing the proxy does changes the traffic the agent and server see; secrets
 are redacted only in what is stored. Redaction is best-effort, so treat
