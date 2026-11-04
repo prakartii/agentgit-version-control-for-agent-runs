@@ -8,7 +8,7 @@ from agentgit_core.objects import Run, Step
 def seed() -> str:
     repo, index = get_repo(), get_index()
     result = repo.put_blob(b"data")
-    step = repo.put_step(Step(index=0, kind="tool_call", tool_name="read", result=result))
+    step = repo.put_step(Step(method="tools/call", tool_name="read", result=result))
     run_id = repo.put_run(Run(steps=(step,), metadata={"agent": "demo"}))
     index.set_ref("main", run_id)
     return run_id
@@ -34,3 +34,14 @@ def test_unknown_run_is_404(api_env: None) -> None:
 
 def test_limit_is_validated(api_env: None) -> None:
     assert TestClient(app).get("/runs?limit=0").status_code == 422
+
+
+def test_incomplete_run_is_reported(api_env: None) -> None:
+    repo, index = get_repo(), get_index()
+    step = repo.put_step(Step(method="tools/call", tool_name="t", outcome="no_response"))
+    run_id = repo.put_run(Run(steps=(step,), status="aborted", dropped_steps=1))
+    index.set_ref("broken", run_id)
+    body = TestClient(app).get("/runs/broken").json()
+    assert body["status"] == "aborted"
+    assert body["dropped_steps"] == 1
+    assert body["steps"][0]["outcome"] == "no_response"
