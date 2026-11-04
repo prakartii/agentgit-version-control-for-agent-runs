@@ -220,3 +220,25 @@ def test_run_hash_helper_matches_store() -> None:
     repo = Repository(MemoryStore())
     blob = repo.put_blob(b"x")
     assert blob == hash_object("blob", b"x")
+
+
+def test_slow_index_does_not_hold_up_the_end_of_the_session() -> None:
+    import time
+
+    class SlowIndex:
+        def index_run(self, run_id: str) -> None:
+            time.sleep(1.0)
+
+    repo = Repository(MemoryStore())
+    session = RecordingSession(repo, index=SlowIndex(), index_timeout=0.1)  # type: ignore[arg-type]
+
+    async def go() -> tuple[Any, float]:
+        await session.start()
+        session.submit(exchange(0))
+        started = time.monotonic()
+        result = await session.close("complete")
+        return result, time.monotonic() - started
+
+    result, waited = asyncio.run(go())
+    assert result.run_id is not None and result.indexed is False
+    assert waited < 0.9  # close() returned without waiting for the slow index
