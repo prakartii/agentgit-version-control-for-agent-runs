@@ -39,3 +39,33 @@ def test_run_id_depends_on_step_order(ids: list[str]) -> None:
     forward = encode_run(Run(steps=tuple(ids)))[0]
     backward = encode_run(Run(steps=tuple(reversed(ids))))[0]
     assert (forward == backward) == (ids == list(reversed(ids)))
+
+
+def test_timings_must_align_with_steps() -> None:
+    from agentgit_core.objects import StepTiming
+
+    timing = StepTiming(started_at_ms=1, duration_ms=2)
+    Run(steps=("a" * 64,), timings=(timing,))  # aligned: ok
+    Run(steps=("a" * 64,))  # timings omitted: ok
+    with pytest.raises(ValidationError):
+        Run(steps=("a" * 64, "b" * 64), timings=(timing,))
+
+
+def test_timings_do_not_change_step_ids() -> None:
+    # The point of ADR-003: identical content gives identical step ids no
+    # matter when it was recorded, so forks can share their prefix.
+    step = Step(method="tools/call", tool_name="read", arguments="x")
+    assert encode_step(step)[0] == encode_step(step.model_copy())[0]
+
+
+def test_completeness_flags_are_part_of_the_run_id() -> None:
+    complete = encode_run(Run())[0]
+    assert encode_run(Run(status="aborted"))[0] != complete
+    assert encode_run(Run(redacted=True))[0] != complete
+    assert encode_run(Run(dropped_steps=1))[0] != complete
+
+
+def test_outcome_is_part_of_the_step_id() -> None:
+    ok = Step(method="tools/call", tool_name="t")
+    failed = Step(method="tools/call", tool_name="t", outcome="no_response")
+    assert encode_step(ok)[0] != encode_step(failed)[0]

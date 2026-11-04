@@ -64,3 +64,9 @@ def test_refs_point_at_existing_runs() -> None:
     assert repo.get_ref("main") == run_id
     with pytest.raises(ObjectNotFoundError):
         repo.set_ref("bad", "0" * 64)
+
+
+def test_step_with_missing_events_blob_is_rejected() -> None:
+    repo = Repository(MemoryStore())
+    with pytest.raises(IntegrityError):
+        repo.put_step(Step(method="tools/call", events="f" * 64))
