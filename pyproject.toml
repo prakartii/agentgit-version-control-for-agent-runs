@@ -2,7 +2,7 @@
 name = "agentgit-workspace"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = ["agentgit-core", "agentgit-api", "agentgit-cli", "agentgit-index", "agentgit-proxy"]
+dependencies = ["agentgit-core", "agentgit-api", "agentgit-cli", "agentgit-index", "agentgit-proxy", "agentgit-demo-servers"]
 
 [tool.uv]
 package = false
@@ -13,6 +13,7 @@ agentgit-api = { workspace = true }
 agentgit-cli = { workspace = true }
 agentgit-index = { workspace = true }
 agentgit-proxy = { workspace = true }
+agentgit-demo-servers = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*", "apps/*"]
@@ -32,7 +33,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 warn_unused_ignores = true
 explicit_package_bases = true
-mypy_path = ["packages/core/src", "apps/api/src", "apps/cli/src", "packages/index/src", "apps/proxy/src"]
+mypy_path = ["packages/core/src", "apps/api/src", "apps/cli/src", "packages/index/src", "apps/proxy/src", "packages/demo_servers/src"]
 
 # Strict on core packages; relaxed elsewhere until they stabilise.
 [[tool.mypy.overrides]]
@@ -45,7 +46,7 @@ addopts = "-ra --strict-markers"
 
 
 [tool.ruff.lint.isort]
-known-first-party = ["agentgit_core", "agentgit_api", "agentgit_cli", "agentgit_index", "agentgit_proxy"]
+known-first-party = ["agentgit_core", "agentgit_api", "agentgit_cli", "agentgit_index", "agentgit_proxy", "agentgit_demo_servers"]
 
 [tool.ruff.lint.per-file-ignores]
 # Alembic's env.py must set up paths before imports; revisions are generated.
