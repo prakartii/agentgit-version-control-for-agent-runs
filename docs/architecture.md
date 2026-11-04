@@ -22,7 +22,8 @@ agent (any framework)
 │        │  Redactor ─ filter _meta ─ canonical JSON │
 │        ▼                                           │
 │   Repository ──► object store (files)              │
-│        └──────► IndexService ──► Postgres          │
+│        ├──────► IndexService ──► Postgres          │
+│        └──────► Journal (crash recovery)           │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -33,7 +34,7 @@ agent (any framework)
 | `packages/core` | Object model (blob, step, run), hashing, object store, repository with integrity checks |
 | `packages/index` | Postgres index of runs, steps and refs; Alembic migrations |
 | `apps/proxy` | The recording proxy: framing, correlator, redaction, sink, stdio and HTTP adapters |
-| `apps/cli` | `agentgit` command: `record`, `log`, `show` |
+| `apps/cli` | `agentgit` command: `record`, `recover`, `log`, `show` |
 | `apps/api` | Read-only HTTP API over the index |
 | `packages/demo_servers` | Two tiny MCP servers for demos and tests |
 
@@ -68,10 +69,12 @@ The object store is the source of truth; Postgres is a rebuildable index
    drops (and counts) exchanges rather than slowing the agent; storage errors
    are counted in `dropped_steps`; indexing has a time limit and its failure
    leaves the stored run intact.
-5. **Nothing is implied.** Unanswered requests are steps with outcome
+5. **Crash safety without a big write.** Steps are journaled one line each, so
+   a killed proxy leaves a recoverable record (ADR-004).
+6. **Nothing is implied.** Unanswered requests are steps with outcome
    `no_response`; abnormal sessions are `aborted`; gaps and redaction are
    flags on the run, and `log` / `show` print them.
-6. **One proxy per upstream server.** Several servers in one agent session
+7. **One proxy per upstream server.** Several servers in one agent session
    produce several runs sharing a `--session` id; stitching them is a replay
    concern.
 
@@ -92,11 +95,11 @@ captured, which is planned with the LLM interface.
 
 ## Known limitations
 
-- **A hard-killed proxy loses the run object.** Blobs and steps are written as
-  exchanges complete, but the run that ties them together is written at the end.
-  If the proxy is killed without a chance to shut down (`SIGKILL`,
-  `TerminateProcess`), those steps exist in the store but no run references
-  them. A journal or periodic checkpoint is the planned fix.
+- **A hard-killed proxy is recoverable, with caveats** (ADR-004). Each session
+  keeps a write-ahead journal; after `SIGKILL` or `TerminateProcess`, run
+  `agentgit recover` to turn it into an `aborted` run. Requests that were still
+  in flight when the process died are not in it, and an operating-system crash
+  or power loss can still lose recent steps (lines are not fsynced).
 - **HTTP mode saves on graceful shutdown** (Ctrl+C / SIGTERM). One proxy process
   is one run, however many client sessions connect. On Windows, signals sent to
   a process started through a virtual-environment launcher may not reach the
