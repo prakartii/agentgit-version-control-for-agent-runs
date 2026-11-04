@@ -10,6 +10,25 @@ every tool call and result. Recordings are stored like git objects
 
 Phase 0 (foundations) in progress. Nothing is usable yet.
 
+## Quickstart
+
+Requires Python 3.12, [uv](https://docs.astral.sh/uv/) and Docker.
+
+```
+uv sync
+uv run pytest
+uv run agentgit version
+uv run uvicorn agentgit_api.main:app   # GET /health
+docker compose up -d                   # Postgres on :5432
+```
+
+## Layout
+
+- `packages/core`: object model, hashing, diff
+- `apps/api`: FastAPI service
+- `apps/cli`: `agentgit` command
+- `docs/adr`: design decisions
+
 ## Planned features
 
 - Record: capture agent runs through an MCP proxy, no SDK needed
