@@ -16,6 +16,9 @@ from agentgit_core.hashing import canonical_json, hash_object
 # request was seen but no reply arrived before the session ended.
 StepOutcome = Literal["ok", "tool_error", "protocol_error", "no_response"]
 RunStatus = Literal["complete", "aborted"]
+# Who sent the request. Always "client" in the current protocol revision;
+# earlier revisions let servers send requests (sampling, roots, elicitation).
+StepOrigin = Literal["client", "server"]
 
 
 class Step(BaseModel):
@@ -24,6 +27,7 @@ class Step(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     method: str  # JSON-RPC method, e.g. "tools/call"
+    origin: StepOrigin = "client"
     outcome: StepOutcome = "ok"
     events: str | None = None  # blob id of notifications seen during the request
     tool_name: str | None = None
