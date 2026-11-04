@@ -19,7 +19,7 @@ uv sync
 uv run pytest
 uv run agentgit version
 uv run uvicorn agentgit_api.main:app   # GET /health
-docker compose up -d                   # Postgres on :5432
+docker compose up -d                   # Postgres on :5433
 ```
 
 ## Layout
