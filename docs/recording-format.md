@@ -67,7 +67,8 @@ Nothing is implied; the run says what it is.
 
 ## Run metadata keys
 
-`recovered_from_journal` (`true` if rebuilt by `agentgit recover` after a hard
+`redaction` (`default` or `off`; replay applies the same setting to live
+requests before matching), `recovered_from_journal` (`true` if rebuilt by `agentgit recover` after a hard
 kill; such runs are `aborted` and omit requests that were in flight), `server` (label of the upstream), `session_id` (shared by the proxies of one
 agent session), `transport` (`stdio` or `http`), `protocol_version`,
 `client_info`, `server_info`, `proxy_version`.

@@ -37,6 +37,7 @@ agent (any framework)
 | `apps/cli` | `agentgit` command: `record`, `recover`, `log`, `show` |
 | `apps/api` | Read-only HTTP API over the index |
 | `packages/demo_servers` | Two tiny MCP servers for demos and tests |
+| `packages/replay` | Replay engine and stdio replay server (`agentgit replay`) |
 | `packages/agents` | Hand-written agent loop, the coding and support agents, the LLM interface (Claude provider, response cache, cost log) |
 
 ## Object model
@@ -89,6 +90,18 @@ or cached model outputs and the same tool results give the same step ids, an
 agent run repeated twice produces an identical sequence of recorded steps (a
 test pins this down).
 
+## Replay (ADR-006)
+
+`agentgit replay <run>` is an MCP server that answers from a recording. A live
+request is normalised exactly like the recorder normalised it (shared
+`normalize_body`), hashed, and served by the first unconsumed recorded step with
+the same method and params blob id; repeated identical calls are served in
+recorded order. There is no fuzzy matching and no fallback to a live server.
+Divergence is reported in three kinds: `unexpected_request` (the agent gets a
+JSON-RPC error, never an invented result), `out_of_order` and `missing_request`.
+Recording a replayed session yields exactly the original step ids, which a test
+checks end to end.
+
 ## Replay and fork: what is exact and what is not
 
 The proxy sees only the tool side of an agent. Calls from the agent to its LLM
@@ -101,8 +114,9 @@ run metadata keep them apart:
 | Tool-side replay | from the recording | live | approximate; the model may choose differently, divergence is reported |
 | Fork / live re-execution (edited tool result or prompt at step N) | steps before N replayed, then live | live | approximate; runs are stamped as such |
 
-Only recording exists today. The model-output half now exists as the response
-cache (`replay` mode); connecting it to recorded runs is the replay phase.
+Strict replay and tool-side replay now exist (ADR-005, ADR-006): tool results
+come from a run, model outputs from the response cache in `replay` mode, or from
+a live model for tool-side replay. Fork is not built yet.
 
 ## Known limitations
 
@@ -134,5 +148,9 @@ cache (`replay` mode); connecting it to recorded runs is the replay phase.
 - **Legacy protocol revisions** (`initialize` handshake, sessions, server
   requests) pass through and are recorded generically, but are only tested with
   a scripted fake, not with a real legacy SDK.
+- **Replay limits** (ADR-006): stdio only; recorded latencies are not reproduced;
+  requests that were never recorded (for example `subscriptions/listen`) are
+  reported as unexpected; the model-output cache and the run are linked by the
+  user, not stored together.
 - **Overhead has not been measured.** No performance claims are made until the
   benchmark phase.

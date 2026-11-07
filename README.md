@@ -20,7 +20,11 @@ Working today:
   Pydantic-validated tool calls, a provider-neutral LLM interface with response
   caching and cost logging, and `agentgit-agent` to run them
 
-Not built yet: replay, fork, diff, Agent CI, chaos testing, UI.
+- **Deterministic replay** (`agentgit replay`): a drop-in MCP server that answers
+  from a recorded run and reports any divergence (unexpected, out-of-order or
+  missing requests)
+
+Not built yet: fork, diff, Agent CI, chaos testing, UI.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 
@@ -74,6 +78,21 @@ Add `--no-index` to skip Postgres (runs are still stored in `.agentgit/objects`)
 Nothing the proxy does changes the traffic the agent and server see; secrets
 are redacted only in what is stored. Redaction is best-effort, so treat
 `.agentgit/` as sensitive.
+
+## Replaying a run
+
+`agentgit replay <run id>` is an MCP server whose answers come from a recording.
+Use it where the real server command would go. With the model output cache in
+`replay` mode, an unchanged agent re-runs with no tool server and no model:
+
+```
+uv run agentgit-agent run support "..." --cache-mode replay     -- uv run agentgit replay <run id> --report replay.json
+```
+
+If the agent asks for something the recording does not contain, replay reports
+it instead of inventing an answer. Exit code 0 means faithful, 1 means diverged.
+Replay is exact for an unchanged agent; if you change the agent, the prompt or
+the model input, divergence is the expected result, not a bug.
 
 ## Running a demo agent
 
