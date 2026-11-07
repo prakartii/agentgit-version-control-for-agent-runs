@@ -16,6 +16,7 @@ members = [
     "agentgit-demo-servers",
     "agentgit-index",
     "agentgit-proxy",
+    "agentgit-replay",
     "agentgit-workspace",
 ]
 
@@ -135,6 +136,21 @@ requires-dist = [
 ]
 
 [[package]]
+name = "agentgit-replay"
+version = "0.0.0"
+source = { editable = "packages/replay" }
+dependencies = [
+    { name = "agentgit-core" },
+    { name = "agentgit-proxy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentgit-core", editable = "packages/core" },
+    { name = "agentgit-proxy", editable = "apps/proxy" },
+]
+
+[[package]]
 name = "agentgit-workspace"
 version = "0.0.0"
 source = { virtual = "." }
@@ -146,6 +162,7 @@ dependencies = [
     { name = "agentgit-demo-servers" },
     { name = "agentgit-index" },
     { name = "agentgit-proxy" },
+    { name = "agentgit-replay" },
 ]
 
 [package.dev-dependencies]
@@ -166,6 +183,7 @@ requires-dist = [
     { name = "agentgit-demo-servers", editable = "packages/demo_servers" },
     { name = "agentgit-index", editable = "packages/index" },
     { name = "agentgit-proxy", editable = "apps/proxy" },
+    { name = "agentgit-replay", editable = "packages/replay" },
 ]
 
 [package.metadata.requires-dev]
