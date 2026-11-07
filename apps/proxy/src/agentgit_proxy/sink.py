@@ -21,7 +21,7 @@ from agentgit_core.repo import Repository
 from agentgit_index.service import IndexService
 from agentgit_proxy.correlator import Exchange, Stats
 from agentgit_proxy.journal import Journal
-from agentgit_proxy.normalize import SessionInfo, filter_meta
+from agentgit_proxy.normalize import SessionInfo, filter_meta, normalize_body
 from agentgit_proxy.redaction import Redactor
 
 log = logging.getLogger("agentgit.proxy")
@@ -96,8 +96,8 @@ class RecordingSession:
     def _persist(self, ex: Exchange) -> None:
         self._info.learn(ex.params, ex.response)
         before = self.redactor.replacements
-        params = self.redactor.redact(filter_meta(ex.params))
-        response = self.redactor.redact(filter_meta(ex.response))
+        params = normalize_body(ex.params, self.redactor)
+        response = normalize_body(ex.response, self.redactor)
         events = self.redactor.redact(
             [{"method": e["method"], "params": filter_meta(e["params"])} for e in ex.events]
         )

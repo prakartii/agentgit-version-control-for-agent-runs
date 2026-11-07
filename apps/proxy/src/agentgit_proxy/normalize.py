@@ -7,6 +7,8 @@ were forwarded are never involved.
 from dataclasses import dataclass
 from typing import Any
 
+from agentgit_proxy.redaction import Redactor
+
 # Per-request noise that would make identical calls look different.
 VOLATILE_META_KEYS = frozenset({"progressToken", "traceparent", "tracestate", "baggage"})
 # Every key under this prefix is reserved by MCP for protocol bookkeeping.
@@ -31,6 +33,15 @@ def filter_meta(body: Any) -> Any:
     if kept:
         out["_meta"] = kept
     return out
+
+
+def normalize_body(body: Any, redactor: Redactor) -> Any:
+    """What gets recorded for a request's params or a response's result.
+
+    Recording and replay both call this, so a live request hashes to the same
+    blob id as the recorded one if and only if it is the same call.
+    """
+    return redactor.redact(filter_meta(body))
 
 
 @dataclass
