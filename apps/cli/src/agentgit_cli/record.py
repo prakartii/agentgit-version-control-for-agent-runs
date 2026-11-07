@@ -58,7 +58,13 @@ def _build_session(
         os.environ.get("DATABASE_URL", DEFAULT_DB), connect_args={"connect_timeout": 3}
     )
     index = IndexService(engine, repo)
-    metadata = {"server": server, "transport": transport, "proxy_version": __version__}
+    metadata = {
+        "server": server,
+        "transport": transport,
+        "proxy_version": __version__,
+        # Replay must redact live requests the same way before matching them.
+        "redaction": "default" if redact else "off",
+    }
     if session_id:
         metadata["session_id"] = session_id
     # With redaction off, an empty rule set makes the redactor a no-op.

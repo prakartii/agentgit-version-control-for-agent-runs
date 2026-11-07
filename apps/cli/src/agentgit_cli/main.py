@@ -2,6 +2,7 @@ import typer
 
 from agentgit_cli.context import load_services
 from agentgit_cli.record import register as register_record
+from agentgit_cli.replay import register as register_replay
 from agentgit_core import __version__
 from agentgit_core.store import ObjectNotFoundError
 
@@ -9,6 +10,7 @@ app = typer.Typer(help="Version control for AI agent runs.", no_args_is_help=Tru
 
 SHORT_ID = 12
 register_record(app)
+register_replay(app)
 
 
 @app.callback()
