@@ -191,3 +191,25 @@ def test_report_serialises_and_summarises() -> None:
     data = report.to_dict()
     assert data["ok"] is False and data["divergences"][0]["kind"] == "missing_request"
     assert "DIVERGED" in report.summary() and "missing_request" in report.summary()
+
+
+def test_live_mode_hands_unrecorded_requests_back_without_flagging_divergence() -> None:
+    from agentgit_replay.engine import PASSTHROUGH
+
+    repo, run_id = record([call(0, "read", "x", path="a.txt")])
+    engine = ReplayEngine(repo, run_id, live=True)
+    recorded = engine.handle(live(1, "tools/call", tool_params("read", path="a.txt")))
+    assert recorded is not None and text_of(recorded) == "x"  # still served from the recording
+    new = engine.handle(live(2, "tools/call", tool_params("write", path="b.txt")))
+    assert new is PASSTHROUGH
+    report = engine.finish()
+    assert report.ok and report.live == 1 and report.served == 1  # reported separately
+    assert report.to_dict()["live_requests"] == 1
+    assert "went to a live server" in report.summary()
+
+
+def test_without_live_mode_the_same_request_is_a_divergence() -> None:
+    repo, run_id = record([call(0, "read", "x", path="a.txt")])
+    engine = ReplayEngine(repo, run_id)
+    reply = engine.handle(live(2, "tools/call", tool_params("write", path="b.txt")))
+    assert reply is not None and "error" in reply and not engine.finish().ok

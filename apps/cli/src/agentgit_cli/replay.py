@@ -5,6 +5,12 @@ Use it where the real server command would go::
     agentgit replay <run id> --report replay.json
 
 Nothing is executed against the real world: results come from the recording.
+With ``--live`` and a server command after ``--``, requests the recording
+cannot answer (what a forked run does next) go to that real server instead of
+being reported as divergence. That part is live re-execution, not replay::
+
+    agentgit replay <fork id> --live -- python -m my_server
+
 When the agent hangs up, a summary goes to stderr (our stdout carries only
 protocol messages) and the exit code says whether replay was faithful.
 """
@@ -24,6 +30,7 @@ from agentgit_core.store import FilesystemStore
 from agentgit_index.service import IndexService
 from agentgit_proxy.stdio_proxy import process_stdin_chunks, process_stdout_write
 from agentgit_replay.engine import ReplayEngine
+from agentgit_replay.live import LiveUpstream
 from agentgit_replay.server import serve_stdio
 
 NOT_FOUND_EXIT_CODE = 2
@@ -71,8 +78,17 @@ def replay_command(
     allow_reorder: Annotated[
         bool, typer.Option(help="Do not treat a different request order as divergence.")
     ] = False,
+    live: Annotated[
+        bool, typer.Option("--live", help="Send unrecorded requests to the server command.")
+    ] = False,
+    command: Annotated[
+        list[str] | None, typer.Argument(help="With --live: the real server command, after `--`.")
+    ] = None,
 ) -> None:
     """Serve a recorded run as an MCP server (stdio) and report divergence."""
+    if live != bool(command):
+        _say("--live needs a server command after `--`, and a command needs --live")
+        raise typer.Exit(NOT_FOUND_EXIT_CODE)
     home = Path(os.environ.get("AGENTGIT_HOME", ".agentgit"))
     repo = Repository(FilesystemStore(home / "objects"))
     run_id = resolve_run_id(home, target, repo)
@@ -80,8 +96,11 @@ def replay_command(
         _say(f"no run matches '{target}'")
         raise typer.Exit(NOT_FOUND_EXIT_CODE)
 
-    engine = ReplayEngine(repo, run_id, allow_reorder=allow_reorder)
-    result = asyncio.run(serve_stdio(engine, process_stdin_chunks(), process_stdout_write))
+    engine = ReplayEngine(repo, run_id, allow_reorder=allow_reorder, live=live)
+    upstream = LiveUpstream(command) if live and command else None
+    result = asyncio.run(
+        serve_stdio(engine, process_stdin_chunks(), process_stdout_write, upstream=upstream)
+    )
     _say(result.summary())
     if report is not None:
         report.parent.mkdir(parents=True, exist_ok=True)

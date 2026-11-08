@@ -10,7 +10,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from agentgit_proxy.framing import DEFAULT_MAX_LINE_BYTES, LineSplitter
-from agentgit_replay.engine import ReplayEngine, ReplayReport
+from agentgit_replay.engine import PASSTHROUGH, ReplayEngine, ReplayReport
+from agentgit_replay.live import LiveUpstream
 
 PARSE_ERROR = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
 
@@ -19,18 +20,32 @@ def _encode(message: Any) -> bytes:
     return json.dumps(message, separators=(",", ":"), ensure_ascii=False).encode("utf-8") + b"\n"
 
 
-def _answer(engine: ReplayEngine, line: bytes) -> bytes | None:
+async def _one(
+    engine: ReplayEngine, message: dict[str, Any], upstream: LiveUpstream | None
+) -> list[dict[str, Any]]:
+    """Messages to send back for one request: normally 0 or 1; more if live notifications."""
+    reply = engine.handle(message)
+    if reply is PASSTHROUGH:
+        # Only reachable in live mode, where the CLI always supplies an upstream.
+        assert upstream is not None
+        return await upstream.ask(message)
+    return [reply] if reply is not None else []
+
+
+async def _answer(engine: ReplayEngine, line: bytes, upstream: LiveUpstream | None) -> list[bytes]:
     try:
         message = json.loads(line)
     except ValueError:
-        return _encode(PARSE_ERROR)
+        return [_encode(PARSE_ERROR)]
     if isinstance(message, list):
-        replies = [r for m in message if isinstance(m, dict) and (r := engine.handle(m))]
-        return _encode(replies) if replies else None
+        replies: list[dict[str, Any]] = []
+        for m in message:
+            if isinstance(m, dict):
+                replies.extend(r for r in await _one(engine, m, upstream) if "method" not in r)
+        return [_encode(replies)] if replies else []
     if isinstance(message, dict):
-        reply = engine.handle(message)
-        return _encode(reply) if reply is not None else None
-    return _encode(PARSE_ERROR)
+        return [_encode(r) for r in await _one(engine, message, upstream)]
+    return [_encode(PARSE_ERROR)]
 
 
 async def serve_stdio(
@@ -38,18 +53,21 @@ async def serve_stdio(
     client_chunks: AsyncIterator[bytes],
     client_write: Callable[[bytes], Awaitable[None]],
     max_line_bytes: int = DEFAULT_MAX_LINE_BYTES,
+    upstream: LiveUpstream | None = None,
 ) -> ReplayReport:
     """Answer requests until the client hangs up, then return the replay report."""
     splitter = LineSplitter(max_line_bytes)
-    async for chunk in client_chunks:
-        for line in splitter.feed(chunk):
-            if line.strip():
-                reply = _answer(engine, line)
-                if reply is not None:
-                    await client_write(reply)
-    tail = splitter.finish()
-    if tail and tail.strip():
-        reply = _answer(engine, tail)
-        if reply is not None:
-            await client_write(reply)
+    try:
+        async for chunk in client_chunks:
+            for line in splitter.feed(chunk):
+                if line.strip():
+                    for out in await _answer(engine, line, upstream):
+                        await client_write(out)
+        tail = splitter.finish()
+        if tail and tail.strip():
+            for out in await _answer(engine, tail, upstream):
+                await client_write(out)
+    finally:
+        if upstream is not None:
+            await upstream.close()
     return engine.finish()

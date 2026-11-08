@@ -5,8 +5,11 @@ nothing, for notifications) comes out. ``server.py`` puts it behind stdio.
 
 Matching (ADR-006): a request is normalised exactly as the recorder normalised
 it, hashed, and served by the first unconsumed recorded step with the same
-``(method, params blob id)``. Nothing is fuzzy and nothing falls back to a live
-server.
+``(method, params blob id)``. Nothing is fuzzy. By default a request with no
+recorded match is a divergence. In ``live`` mode (used to continue a forked run)
+it is instead handed back as ``PASSTHROUGH`` for the caller to send to a real
+server; that part of the session is live re-execution, not replay, and is
+counted separately in the report.
 """
 
 import json
@@ -21,6 +24,9 @@ from agentgit_proxy.normalize import RESERVED_META_PREFIX, normalize_body
 from agentgit_proxy.redaction import Redactor
 
 DivergenceKind = Literal["unexpected_request", "out_of_order", "missing_request"]
+
+# Returned by ``handle`` in live mode for a request the recording cannot answer.
+PASSTHROUGH: dict[str, Any] = {"passthrough": True}
 
 # JSON-RPC "internal error": what the agent sees when replay cannot answer.
 REPLAY_ERROR_CODE = -32603
@@ -52,6 +58,7 @@ class ReplayReport:
     recorded_steps: int
     requests_received: int
     served: int
+    live: int = 0  # requests sent to a live server (live mode only); not replayed
     divergences: list[Divergence] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -67,6 +74,7 @@ class ReplayReport:
             "recorded_steps": self.recorded_steps,
             "requests_received": self.requests_received,
             "served": self.served,
+            "live_requests": self.live,
             "divergences": [d.to_dict() for d in self.divergences],
             "warnings": self.warnings,
         }
@@ -78,6 +86,8 @@ class ReplayReport:
             f"({self.served}/{self.recorded_steps} recorded steps served, "
             f"{self.requests_received} requests received)"
         ]
+        if self.live:
+            lines.append(f"  {self.live} request(s) went to a live server (not replayed)")
         lines += [f"  warning: {w}" for w in self.warnings]
         for d in self.divergences:
             tool = f" {d.tool_name}" if d.tool_name else ""
@@ -100,7 +110,10 @@ class ReplayEngine:
         *,
         allow_reorder: bool = False,
         redactor: Redactor | None = None,
+        live: bool = False,
     ) -> None:
+        self._live = live
+        self._live_count = 0
         self._repo = repo
         self._run_id = run_id
         self._allow_reorder = allow_reorder
@@ -127,7 +140,11 @@ class ReplayEngine:
 
     # -- public ---------------------------------------------------------------
     def handle(self, message: dict[str, Any]) -> dict[str, Any] | None:
-        """Answer one JSON-RPC message. Returns None for notifications."""
+        """Answer one JSON-RPC message. Returns None for notifications.
+
+        In live mode an unmatched request returns ``PASSTHROUGH`` (compare with
+        ``is``) and the caller must forward it to a real server.
+        """
         method = message.get("method")
         msg_id = message.get("id")
         if not isinstance(method, str) or not _is_id(msg_id):
@@ -137,6 +154,9 @@ class ReplayEngine:
         params = message.get("params")
         key = (method, self._params_blob_id(params))
         queue = self._queues.get(key)
+        if not queue and self._live:
+            self._live_count += 1
+            return PASSTHROUGH
         if not queue:
             self._diverge(
                 "unexpected_request",
@@ -183,6 +203,7 @@ class ReplayEngine:
             recorded_steps=len(self._recorded),
             requests_received=self._received,
             served=self._served,
+            live=self._live_count,
             divergences=list(self._divergences),
             warnings=list(self._warnings),
         )
