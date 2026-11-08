@@ -24,7 +24,11 @@ Working today:
   from a recorded run and reports any divergence (unexpected, out-of-order or
   missing requests)
 
-Not built yet: fork, diff, Agent CI, chaos testing, UI.
+- **Fork, diff and checkout**: branch a run at a step with an edited tool result,
+  compare two runs path by path, export a run as readable JSON, and continue a
+  fork against a live server (`replay --live`)
+
+Not built yet: Agent CI, chaos testing, UI.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 
@@ -94,6 +98,29 @@ it instead of inventing an answer. Exit code 0 means faithful, 1 means diverged.
 Replay is exact for an unchanged agent; if you change the agent, the prompt or
 the model input, divergence is the expected result, not a bug.
 
+## Forking and diffing runs
+
+```
+agentgit checkout <run id> --to ./export            # read a run as JSON files
+agentgit fork <run id> --at 3 --result-file edited.json   # new run, one result changed
+agentgit diff <run id> <fork id>                    # exit code 1 if they differ
+```
+
+A fork keeps the steps before `--at` (the same stored objects, so the shared
+history is verifiable by id) and replaces that step's result; the steps after it
+are dropped. To see what the agent does next, record a replay of the fork that
+falls through to a real server for anything the recording lacks:
+
+```
+agentgit record -- agentgit replay <fork id> --live -- <real server command>
+agentgit diff <run id> <new run id>
+```
+
+The part before the fork point is exact replay. The part after is live
+re-execution: the model is not deterministic and real tools run (side effects
+included), so it is approximate. Prompts are not part of a run's steps, so a
+fork edits tool results only. See ADR-007.
+
 ## Running a demo agent
 
 The agents need a model. With an Anthropic key in `ANTHROPIC_API_KEY`:
@@ -125,8 +152,7 @@ provider has been tested against the SDK's types, not the live API.
 
 - Record: capture agent runs through an MCP proxy, no SDK needed
 - Replay: re-run an agent against recorded tool outputs and detect divergence
-- Fork: change a tool result or prompt at step N and continue as a new branch
-- Diff: compare two runs (tool calls, arguments, cost, latency, outcome)
+- Diff of cost and latency between runs (steps and payloads are done)
 - Agent CI: replay saved scenarios on each pull request
 - Chaos testing: inject faults and prompt-injection payloads into tool results
 

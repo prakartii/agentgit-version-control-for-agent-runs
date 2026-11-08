@@ -114,11 +114,31 @@ run metadata keep them apart:
 | Tool-side replay | from the recording | live | approximate; the model may choose differently, divergence is reported |
 | Fork / live re-execution (edited tool result or prompt at step N) | steps before N replayed, then live | live | approximate; runs are stamped as such |
 
-Strict replay and tool-side replay now exist (ADR-005, ADR-006): tool results
-come from a run, model outputs from the response cache in `replay` mode, or from
-a live model for tool-side replay. Fork is not built yet.
+Strict replay, tool-side replay and fork continuation now exist (ADR-005,
+ADR-006, ADR-007): tool results come from a run, model outputs from the response
+cache in `replay` mode, or from a live model. A fork serves the shared prefix by
+exact replay and, with `replay --live`, sends everything after the fork point to
+a real server; the report counts those requests separately.
+
+## Fork and diff (ADR-007)
+
+A fork is a run whose `parents` is the source and whose `fork_step` is where they
+diverge; its steps are the same step objects as the source's prefix plus one
+edited copy of the fork step. `diff` finds the common prefix by comparing step
+ids (no payload reads), aligns the rest with a sequence matcher, and compares
+aligned steps field by field and JSON path by JSON path. Only `tools/call`
+results can be edited; the model side of an agent is not in a run.
 
 ## Known limitations
+
+- **Live continuation needs a stateless-era server.** The live upstream is
+  started lazily and sees no `initialize`; a legacy server that requires one
+  rejects the forwarded requests. It also runs real tools with a live model, so it
+  is approximate and can have side effects.
+- **Handshake shape varies under load.** The SDK client may fall back from
+  `server/discover` to `initialize` on a starved machine, which changes the
+  recording; one end-to-end replay test failed once for that reason and passed on
+  re-run.
 
 - **A hard-killed proxy is recoverable, with caveats** (ADR-004). Each session
   keeps a write-ahead journal; after `SIGKILL` or `TerminateProcess`, run
