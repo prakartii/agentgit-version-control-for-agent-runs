@@ -1,5 +1,6 @@
 import typer
 
+from agentgit_cli.ci.command import register as register_ci
 from agentgit_cli.context import load_services
 from agentgit_cli.record import register as register_record
 from agentgit_cli.replay import register as register_replay
@@ -13,6 +14,7 @@ SHORT_ID = 12
 register_record(app)
 register_replay(app)
 register_vcs(app)
+register_ci(app)
 
 
 @app.callback()
