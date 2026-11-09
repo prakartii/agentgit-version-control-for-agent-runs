@@ -14,7 +14,7 @@ counted separately in the report.
 
 import json
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from agentgit_core.hashing import canonical_json
@@ -82,7 +82,12 @@ class ReplayReport:
             "live_requests": self.live,
             "observed_calls": self.observed_calls,
             "chaos_applied": [
-                {"tool": a.tool_name, "fault": a.fault, "detail": a.detail}
+                {
+                    "tool": a.tool_name,
+                    "fault": a.fault,
+                    "detail": a.detail,
+                    "call_index": a.call_index,
+                }
                 for a in self.chaos_applied
             ],
             "divergences": [d.to_dict() for d in self.divergences],
@@ -211,7 +216,8 @@ class ReplayEngine:
         reply = self._reply(msg_id, rec.step)
         if self._chaos is not None and method == "tools/call":
             outcome = self._chaos.apply(rec.step.tool_name, reply)
-            self._chaos_applied.extend(outcome.applied)
+            index = len(self._observed) - 1  # this call's position among observed calls
+            self._chaos_applied.extend(replace(a, call_index=index) for a in outcome.applied)
             self.last_delay_s = outcome.delay_s
             return outcome.reply
         return reply

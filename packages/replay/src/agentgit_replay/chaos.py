@@ -72,6 +72,7 @@ class Applied:
     tool_name: str
     fault: FaultName
     detail: str = ""
+    call_index: int = -1  # position among the agent's tool calls; set by the engine
 
 
 @dataclass
