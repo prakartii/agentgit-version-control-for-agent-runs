@@ -46,6 +46,10 @@ class Repository:
     def has_step(self, object_id: str) -> bool:
         return self._store.has("step", object_id)
 
+    def raw(self, object_type: str, object_id: str) -> bytes:
+        """The stored bytes of any object, for export."""
+        return self._store.get(object_type, object_id)
+
     def get_blob(self, object_id: str) -> bytes:
         data = self._store.get("blob", object_id)
         if blob_id(data) != object_id:
