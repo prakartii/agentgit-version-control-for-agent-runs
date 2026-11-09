@@ -5,6 +5,7 @@ produced in request order, one at a time. The session ends when the client
 closes stdin; the engine then reports what was and was not exercised.
 """
 
+import asyncio
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
@@ -25,6 +26,8 @@ async def _one(
 ) -> list[dict[str, Any]]:
     """Messages to send back for one request: normally 0 or 1; more if live notifications."""
     reply = engine.handle(message)
+    if engine.last_delay_s:
+        await asyncio.sleep(engine.last_delay_s)  # chaos: a slow tool
     if reply is PASSTHROUGH:
         # Only reachable in live mode, where the CLI always supplies an upstream.
         assert upstream is not None

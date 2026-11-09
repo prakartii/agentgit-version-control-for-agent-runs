@@ -213,3 +213,40 @@ def test_without_live_mode_the_same_request_is_a_divergence() -> None:
     engine = ReplayEngine(repo, run_id)
     reply = engine.handle(live(2, "tools/call", tool_params("write", path="b.txt")))
     assert reply is not None and "error" in reply and not engine.finish().ok
+
+
+def test_chaos_damages_the_served_result_and_is_reported() -> None:
+    from agentgit_replay.chaos import ChaosPlan, Plan, Rule
+
+    repo, run_id = record([call(0, "read", "clean text", path="a.txt")])
+    plan = ChaosPlan(Plan(rules=[Rule(fault="inject", payload="EVIL")]))
+    engine = ReplayEngine(repo, run_id, chaos=plan)
+    reply = engine.handle(live(1, "tools/call", tool_params("read", path="a.txt")))
+    assert reply is not None and text_of(reply) == "clean text\nEVIL"
+    report = engine.finish()
+    assert report.ok  # the *replay* was faithful; the data was altered on purpose
+    assert [(a.tool_name, a.fault) for a in report.chaos_applied] == [("read", "inject")]
+    assert report.to_dict()["chaos_applied"][0]["fault"] == "inject"
+
+
+def test_every_tool_call_is_observed_even_when_unmatched() -> None:
+    repo, run_id = record([call(0, "read", "x", path="a.txt")])
+    engine = ReplayEngine(repo, run_id)
+    engine.handle(live(1, "tools/call", tool_params("read", path="a.txt")))
+    engine.handle(live(2, "tools/call", tool_params("write", path="b.txt", data="D")))
+    engine.handle(live(3, "tools/list"))  # not a tool call
+    assert engine.finish().observed_calls == [
+        {"tool": "read", "arguments": {"path": "a.txt"}},
+        {"tool": "write", "arguments": {"path": "b.txt", "data": "D"}},
+    ]
+
+
+def test_delay_is_exposed_for_the_server_to_wait_on() -> None:
+    from agentgit_replay.chaos import ChaosPlan, Plan, Rule
+
+    repo, run_id = record([call(0, "read", "x", path="a.txt")])
+    engine = ReplayEngine(
+        repo, run_id, chaos=ChaosPlan(Plan(rules=[Rule(fault="delay", delay_ms=40)]))
+    )
+    engine.handle(live(1, "tools/call", tool_params("read", path="a.txt")))
+    assert engine.last_delay_s == 0.04

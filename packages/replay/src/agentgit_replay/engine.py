@@ -22,6 +22,7 @@ from agentgit_core.objects import Run, Step, blob_id
 from agentgit_core.repo import Repository
 from agentgit_proxy.normalize import RESERVED_META_PREFIX, normalize_body
 from agentgit_proxy.redaction import Redactor
+from agentgit_replay.chaos import Applied, ChaosPlan
 
 DivergenceKind = Literal["unexpected_request", "out_of_order", "missing_request"]
 
@@ -58,6 +59,10 @@ class ReplayReport:
     recorded_steps: int
     requests_received: int
     served: int
+    # Every tools/call the agent made (tool and normalised arguments), whether or not it
+    # matched the recording. Policies judge the agent by this.
+    observed_calls: list[dict[str, Any]] = field(default_factory=list)
+    chaos_applied: list[Applied] = field(default_factory=list)
     live: int = 0  # requests sent to a live server (live mode only); not replayed
     divergences: list[Divergence] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -75,6 +80,11 @@ class ReplayReport:
             "requests_received": self.requests_received,
             "served": self.served,
             "live_requests": self.live,
+            "observed_calls": self.observed_calls,
+            "chaos_applied": [
+                {"tool": a.tool_name, "fault": a.fault, "detail": a.detail}
+                for a in self.chaos_applied
+            ],
             "divergences": [d.to_dict() for d in self.divergences],
             "warnings": self.warnings,
         }
@@ -111,7 +121,13 @@ class ReplayEngine:
         allow_reorder: bool = False,
         redactor: Redactor | None = None,
         live: bool = False,
+        chaos: ChaosPlan | None = None,
     ) -> None:
+        self._chaos = chaos
+        self._observed: list[dict[str, Any]] = []
+        self._chaos_applied: list[Applied] = []
+        # Set by handle(): how long the caller should wait before sending the reply.
+        self.last_delay_s = 0.0
         self._live = live
         self._live_count = 0
         self._repo = repo
@@ -151,7 +167,15 @@ class ReplayEngine:
             return None  # notifications, responses and junk get no reply
 
         self._received += 1
+        self.last_delay_s = 0.0
         params = message.get("params")
+        if method == "tools/call" and isinstance(params, dict):
+            self._observed.append(
+                {
+                    "tool": params.get("name"),
+                    "arguments": normalize_body(params.get("arguments"), self._redactor),
+                }
+            )
         key = (method, self._params_blob_id(params))
         queue = self._queues.get(key)
         if not queue and self._live:
@@ -184,7 +208,13 @@ class ReplayEngine:
                 f"recorded step {first_pending.position} "
                 f"({first_pending.step.method}) was expected first",
             )
-        return self._reply(msg_id, rec.step)
+        reply = self._reply(msg_id, rec.step)
+        if self._chaos is not None and method == "tools/call":
+            outcome = self._chaos.apply(rec.step.tool_name, reply)
+            self._chaos_applied.extend(outcome.applied)
+            self.last_delay_s = outcome.delay_s
+            return outcome.reply
+        return reply
 
     def finish(self) -> ReplayReport:
         """End of session: every recorded step never requested is a divergence."""
@@ -204,6 +234,8 @@ class ReplayEngine:
             requests_received=self._received,
             served=self._served,
             live=self._live_count,
+            observed_calls=list(self._observed),
+            chaos_applied=list(self._chaos_applied),
             divergences=list(self._divergences),
             warnings=list(self._warnings),
         )
