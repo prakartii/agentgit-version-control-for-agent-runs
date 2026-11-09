@@ -16,8 +16,10 @@ chaos run exercises the agent's handling of bad data, not the tool's.
 """
 
 import random
+import tomllib
 from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -178,3 +180,11 @@ class ChaosPlan:
         outcome.applied.append(
             Applied(name, rule.fault, rule.payload[:60] if rule.fault == "inject" else "")
         )
+
+
+def load_plan(path: Path) -> Plan:
+    """Read a chaos plan from TOML (``seed = 1`` and one ``[[rules]]`` table per rule)."""
+    try:
+        return Plan.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
+    except (OSError, tomllib.TOMLDecodeError, ValueError) as e:
+        raise ValueError(f"{path}: {e}") from None

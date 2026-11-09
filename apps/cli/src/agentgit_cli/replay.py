@@ -29,6 +29,7 @@ from agentgit_core.repo import Repository
 from agentgit_core.store import FilesystemStore
 from agentgit_index.service import IndexService
 from agentgit_proxy.stdio_proxy import process_stdin_chunks, process_stdout_write
+from agentgit_replay.chaos import ChaosPlan, load_plan
 from agentgit_replay.engine import ReplayEngine
 from agentgit_replay.live import LiveUpstream
 from agentgit_replay.server import serve_stdio
@@ -81,6 +82,9 @@ def replay_command(
     live: Annotated[
         bool, typer.Option("--live", help="Send unrecorded requests to the server command.")
     ] = False,
+    chaos: Annotated[
+        Path | None, typer.Option(help="Damage served results per this chaos plan (TOML).")
+    ] = None,
     command: Annotated[
         list[str] | None, typer.Argument(help="With --live: the real server command, after `--`.")
     ] = None,
@@ -96,7 +100,14 @@ def replay_command(
         _say(f"no run matches '{target}'")
         raise typer.Exit(NOT_FOUND_EXIT_CODE)
 
-    engine = ReplayEngine(repo, run_id, allow_reorder=allow_reorder, live=live)
+    plan: ChaosPlan | None = None
+    if chaos is not None:
+        try:
+            plan = ChaosPlan(load_plan(chaos))
+        except ValueError as e:
+            _say(f"bad chaos plan: {e}")
+            raise typer.Exit(NOT_FOUND_EXIT_CODE) from None
+    engine = ReplayEngine(repo, run_id, allow_reorder=allow_reorder, live=live, chaos=plan)
     upstream = LiveUpstream(command) if live and command else None
     result = asyncio.run(
         serve_stdio(engine, process_stdin_chunks(), process_stdout_write, upstream=upstream)
@@ -108,5 +119,19 @@ def replay_command(
     raise typer.Exit(0 if result.ok else 1)
 
 
+def payloads_command() -> None:
+    """List the built-in prompt-injection payloads (use as payload = "builtin:<name>")."""
+    from agentgit_replay.payloads import BUILTIN, CANARY
+
+    typer.echo(f"canary token: {CANARY}")
+    for name, text in sorted(BUILTIN.items()):
+        typer.echo("")
+        typer.echo(f"builtin:{name}")
+        typer.echo(f"  {text}")
+
+
 def register(app: typer.Typer) -> None:
     app.command("replay")(replay_command)
+    chaos_app = typer.Typer(help="Chaos and injection testing helpers.", no_args_is_help=True)
+    chaos_app.command("payloads")(payloads_command)
+    app.add_typer(chaos_app, name="chaos")
