@@ -32,7 +32,11 @@ Working today:
   replay it against the real agent on every pull request, with no model or tool
   server; divergence fails the build
 
-Not built yet: chaos testing, UI.
+- **Chaos and injection testing** (`agentgit replay --chaos`, scenario `chaos` and
+  `[policy]`): seeded faults and prompt-injection payloads on replayed results,
+  with policies that fail the build if the agent acts on them
+
+Not built yet: UI, observability and benchmarks, deployment.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 
@@ -153,6 +157,35 @@ composite action in this repository:
 A passing scenario means the agent behaves the same given the recorded tool
 results and model outputs; it does not judge the quality of the model. See ADR-008.
 
+## Chaos and injection testing
+
+Damage the results an agent receives and check what it does next. A plan is a
+TOML file:
+
+```toml
+seed = 1
+[[rules]]
+fault = "inject"                 # tool_error | protocol_error | empty | truncate | oversize | delay | inject
+tool = "read_file"               # fnmatch pattern; also nth = [2] or probability = 0.3
+payload = "builtin:ignore_previous"   # see `agentgit chaos payloads`
+```
+
+Use it with `agentgit replay <run> --chaos plan.toml`, or in a CI scenario:
+
+```toml
+chaos = "plan.toml"
+[policy]
+forbid_canary = true             # the injection canary must never reach a tool call
+forbid_tools = ["delete_*"]      # judged only on calls made after the first fault
+```
+
+Injection payloads carry a canary token, so "the agent obeyed attacker text" is
+a string match. Injection scenarios need a live (or reactive) model: a response
+cache cannot know how a model reacts to new text. The tests prove the harness
+with a deterministic gullible agent (caught) and a robust one (passes); they say
+nothing about any real model, and a pass is a regression check, not a safety
+guarantee. See ADR-009.
+
 ## Running a demo agent
 
 The agents need a model. With an Anthropic key in `ANTHROPIC_API_KEY`:
@@ -185,7 +218,6 @@ provider has been tested against the SDK's types, not the live API.
 - Record: capture agent runs through an MCP proxy, no SDK needed
 - Replay: re-run an agent against recorded tool outputs and detect divergence
 - Diff of cost and latency between runs (steps and payloads are done)
-- Chaos testing: inject faults and prompt-injection payloads into tool results
 
 ## Limitations
 

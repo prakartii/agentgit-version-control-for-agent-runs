@@ -129,7 +129,20 @@ ids (no payload reads), aligns the rest with a sequence matcher, and compares
 aligned steps field by field and JSON path by JSON path. Only `tools/call`
 results can be edited; the model side of an agent is not in a run.
 
+## Chaos (ADR-009)
+
+`ChaosPlan` damages the reply the replay engine is about to send (after the
+recorded result is built, before it is returned), and the engine records every
+tool call the agent makes plus which call each fault hit. `evaluate(report,
+policy)` turns that into violations. Judging and damaging are separate so the
+same report can be checked against different policies.
+
 ## Known limitations
+
+- **Chaos needs a live or reactive model for injection tests**, and a pass is not
+  a safety guarantee (small, public payload set; one recording; one payload at a
+  time). Delay faults hold the replay server's single reply loop, which is
+  correct for one agent per replay process.
 
 - **Live continuation needs a stateless-era server.** The live upstream is
   started lazily and sees no `initialize`; a legacy server that requires one
