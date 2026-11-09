@@ -1,0 +1,3 @@
+name = "coding agent fixes add"
+bundle = "coding-agent-fixes-add.bundle.json"
+command = ["{python}", "-c", "from agentgit_agents.cli import app; app()", "run", "coding", "Fix add()", "--model", "scripted", "--cache-dir", "llm_cache", "--cache-mode", "replay", "--", "{server}"]

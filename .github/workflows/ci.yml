@@ -29,3 +29,13 @@ jobs:
       - run: uv run ruff check .
       - run: uv run mypy packages/core/src packages/index/src packages/demo_servers packages/agents packages/replay apps
       - run: uv run pytest
+
+  # Dogfooding: this repository's own agent-regression scenario, run by the
+  # same composite action other repositories would use.
+  agent-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          scenarios: examples/agent-ci

@@ -1,0 +1,142 @@
+{
+  "request": {
+    "model": "scripted",
+    "system": "You are a careful coding agent. You work inside a sandboxed project directory using the provided file tools.\n- Look at the directory and read the relevant files before changing anything.\n- Make the smallest change that completes the task, and write whole files.\n- Do not touch files unrelated to the task.\n- When finished, reply with a short summary of what you changed and why.",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Fix add()"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "c1",
+            "name": "list_files",
+            "input": {}
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "c1",
+            "content": "calc.py",
+            "is_error": false
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "c2",
+            "name": "read_file",
+            "input": {
+              "path": "calc.py"
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "c2",
+            "content": "def add(a, b):\n    return a - b\n",
+            "is_error": false
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "name": "read_file",
+        "description": "Read a UTF-8 text file.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "title": "read_fileArguments"
+        }
+      },
+      {
+        "name": "write_file",
+        "description": "Write a UTF-8 text file, creating parent directories.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "title": "Path",
+              "type": "string"
+            },
+            "content": {
+              "title": "Content",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "title": "write_fileArguments"
+        }
+      },
+      {
+        "name": "list_files",
+        "description": "List file names directly inside a directory.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "default": ".",
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          "title": "list_filesArguments"
+        }
+      }
+    ],
+    "max_tokens": 16000,
+    "effort": null
+  },
+  "response": {
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "c3",
+        "name": "write_file",
+        "input": {
+          "path": "calc.py",
+          "content": "def add(a, b):\n    return a + b\n"
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0
+    },
+    "model": "scripted"
+  }
+}

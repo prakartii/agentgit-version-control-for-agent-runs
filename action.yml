@@ -1,0 +1,41 @@
+name: AgentGit Agent CI
+description: Replay saved agent scenarios against recorded tool results and fail the build if behaviour changed.
+
+inputs:
+  scenarios:
+    description: Scenario files or directories (looks for *.scenario.toml).
+    default: scenarios
+  install:
+    description: Command that installs agentgit and your agent into the environment `uv run` uses.
+    default: uv sync --locked
+  working-directory:
+    description: Directory to run in.
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v5
+    - name: Install
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: ${{ inputs.install }}
+    - name: Replay scenarios
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Capture the exit code so the summary and artifact are written even on failure.
+        set +e
+        uv run agentgit ci run ${{ inputs.scenarios }} \
+          --report-md "$RUNNER_TEMP/agentgit-ci.md" --junit "$RUNNER_TEMP/agentgit-ci.xml"
+        code=$?
+        cat "$RUNNER_TEMP/agentgit-ci.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null
+        exit $code
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agentgit-ci-report
+        path: |
+          ${{ runner.temp }}/agentgit-ci.md
+          ${{ runner.temp }}/agentgit-ci.xml
