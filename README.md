@@ -28,7 +28,11 @@ Working today:
   compare two runs path by path, export a run as readable JSON, and continue a
   fork against a live server (`replay --live`)
 
-Not built yet: Agent CI, chaos testing, UI.
+- **Agent CI** (`agentgit ci`, `action.yml`): save a recording as a scenario and
+  replay it against the real agent on every pull request, with no model or tool
+  server; divergence fails the build
+
+Not built yet: chaos testing, UI.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 
@@ -121,6 +125,34 @@ re-execution: the model is not deterministic and real tools run (side effects
 included), so it is approximate. Prompts are not part of a run's steps, so a
 fork edits tool results only. See ADR-007.
 
+## Agent CI
+
+Turn a recording into a regression test:
+
+```
+agentgit ci add <run id> --name "support refund" --dir scenarios --     agentgit-agent run support "Refund order 42" --model <model>     --cache-dir llm_cache --cache-mode replay -- {server}
+agentgit ci run scenarios --report-md summary.md --junit report.xml
+```
+
+`ci add` writes a portable bundle (the run and everything it references) and a
+`.scenario.toml`; commit both, plus the model-response cache. `{server}` is where
+the replay server goes. `ci run` replays each scenario to the real agent and
+fails (exit 1) if the agent exits unexpectedly, makes a request the recording
+never contained, or stops making one it did. Add it to a workflow with the
+composite action in this repository:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: prakartii/agentgit-version-control-for-agent-runs@main
+  with:
+    scenarios: scenarios
+    install: uv sync --locked   # however your repo installs agentgit and the agent
+```
+
+`examples/agent-ci` is a working scenario that this repository's own CI runs.
+A passing scenario means the agent behaves the same given the recorded tool
+results and model outputs; it does not judge the quality of the model. See ADR-008.
+
 ## Running a demo agent
 
 The agents need a model. With an Anthropic key in `ANTHROPIC_API_KEY`:
@@ -153,7 +185,6 @@ provider has been tested against the SDK's types, not the live API.
 - Record: capture agent runs through an MCP proxy, no SDK needed
 - Replay: re-run an agent against recorded tool outputs and detect divergence
 - Diff of cost and latency between runs (steps and payloads are done)
-- Agent CI: replay saved scenarios on each pull request
 - Chaos testing: inject faults and prompt-injection payloads into tool results
 
 ## Limitations
