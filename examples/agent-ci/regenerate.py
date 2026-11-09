@@ -53,14 +53,14 @@ def main() -> None:
         py = sys.executable
         server = [py, "-m", "agentgit_cli", "record", "--no-index", "--",
                   py, "-m", "agentgit_demo_servers.files"]  # fmt: skip
-        llm = CachingLLM(
-            ScriptedLLM(list(SCRIPT)), FileResponseCache(HERE / "llm_cache"), "record"
-        )
+        llm = CachingLLM(ScriptedLLM(list(SCRIPT)), FileResponseCache(HERE / "llm_cache"), "record")
 
         async def go() -> None:
             params = StdioServerParameters(command=server[0], args=server[1:], env=env)
             async with McpToolClient(params) as tools:
-                result = await run_agent(CODING_AGENT, AgentConfig(model="scripted"), llm, tools, TASK)
+                result = await run_agent(
+                    CODING_AGENT, AgentConfig(model="scripted"), llm, tools, TASK
+                )
             assert result.status == "completed", result
 
         asyncio.run(go())
