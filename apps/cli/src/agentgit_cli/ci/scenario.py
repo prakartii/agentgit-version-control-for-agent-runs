@@ -19,6 +19,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from agentgit_replay.policy import Policy
+
 SERVER_TOKEN = "{server}"
 PYTHON_TOKEN = "{python}"
 
@@ -40,6 +42,11 @@ class Scenario(BaseModel):
     stdout_contains: list[str] = []
     timeout_seconds: float = Field(default=120.0, gt=0)
     env: dict[str, str] = {}
+    # Chaos scenarios: damage served results per this plan file (relative to the scenario),
+    # and fail if the agent then does something `policy` forbids. The agent's model must
+    # be live or reactive: a response cache cannot know how a model reacts to new text.
+    chaos: str | None = None
+    policy: Policy = Policy()
 
     def has_server_token(self) -> bool:
         return SERVER_TOKEN in self.command

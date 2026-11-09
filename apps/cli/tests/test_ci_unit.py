@@ -49,3 +49,20 @@ def test_reports_name_failures() -> None:
     suite = ET.fromstring(junit_xml([ok, bad]))
     assert suite.get("tests") == "2" and suite.get("failures") == "1"
     assert suite.findall("testcase/failure")[0].get("message") == "agent exited 1, expected 0"
+
+
+def test_chaos_scenarios_carry_a_plan_and_a_policy(tmp_path: Path) -> None:
+    f = tmp_path / "a.scenario.toml"
+    f.write_text(
+        GOOD + 'chaos = "plan.toml"\n[policy]\nforbid_canary = true\nforbid_tools = ["rm"]\n'
+    )
+    scenario, _ = load_scenario(f)
+    assert scenario.chaos == "plan.toml"
+    assert scenario.policy.forbid_canary and scenario.policy.forbid_tools == ["rm"]
+
+
+def test_a_bad_policy_key_is_a_scenario_error(tmp_path: Path) -> None:
+    f = tmp_path / "a.scenario.toml"
+    f.write_text(GOOD + "[policy]\nforbid_tool = []\n")  # typo
+    with pytest.raises(ScenarioError):
+        load_scenario(f)

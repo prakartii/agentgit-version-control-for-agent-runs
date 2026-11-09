@@ -18,6 +18,7 @@ from typing import Any
 from agentgit_cli.ci.scenario import PYTHON_TOKEN, SERVER_TOKEN, Scenario
 from agentgit_core.bundle import BundleError, import_bundle
 from agentgit_core.store import FilesystemStore
+from agentgit_replay.policy import evaluate
 
 MAX_OUTPUT_CHARS = 4000
 
@@ -79,6 +80,8 @@ def run_scenario(scenario: Scenario, scenario_file: Path, workdir: Path) -> Scen
             "--report",
             str(report_file),
         ]
+        if scenario.chaos:
+            server += ["--chaos", str(workdir / scenario.chaos)]
         env = {**os.environ, **scenario.env, "AGENTGIT_HOME": str(home)}
         try:
             proc = subprocess.run(
@@ -108,11 +111,16 @@ def run_scenario(scenario: Scenario, scenario_file: Path, workdir: Path) -> Scen
         result.failures.append(f"agent exited {proc.returncode}, expected {scenario.expect_exit}")
     if result.replay is None:
         result.failures.append("no replay report: the agent never connected to the replay server")
-    elif not result.replay["ok"] and not scenario.allow_divergence:
+    elif not result.replay["ok"] and not scenario.allow_divergence and not scenario.chaos:
+        # (Under chaos the data is changed on purpose, so divergence is expected; the
+        # policy is what judges those runs.)
         kinds = sorted({d["kind"] for d in result.replay["divergences"]})
         result.failures.append(
             f"replay diverged ({len(result.replay['divergences'])}: {', '.join(kinds)})"
         )
+    if result.replay is not None:
+        violations = evaluate(result.replay, scenario.policy)
+        result.failures.extend(f"policy violated: {v.describe()}" for v in violations)
     for needle in scenario.stdout_contains:
         if needle not in proc.stdout:
             result.failures.append(f"output does not contain {needle!r}")
