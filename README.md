@@ -36,7 +36,10 @@ Working today:
   `[policy]`): seeded faults and prompt-injection payloads on replayed results,
   with policies that fail the build if the agent acts on them
 
-Not built yet: UI, observability and benchmarks, deployment.
+- **Web UI** (`apps/web`, Next.js): browse runs, expand steps, and view the diff
+  between a run and its fork. Read-only; see ADR-010.
+
+Not built yet: observability and benchmarks, deployment.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 
@@ -129,6 +132,17 @@ re-execution: the model is not deterministic and real tools run (side effects
 included), so it is approximate. Prompts are not part of a run's steps, so a
 fork edits tool results only. See ADR-007.
 
+## Web UI
+
+```
+docker compose up -d                       # Postgres
+uv run uvicorn agentgit_api.main:app       # API on :8000
+cd apps/web && npm install && npm run dev  # UI on :3000
+```
+
+Set `AGENTGIT_API_URL` if the API is elsewhere. The UI shows runs recorded with
+`agentgit record` once they are in the index.
+
 ## Agent CI
 
 Turn a recording into a regression test:
@@ -209,7 +223,8 @@ provider has been tested against the SDK's types, not the live API.
 - `apps/proxy`: recording proxy (stdio and HTTP)
 - `packages/demo_servers`: demo MCP servers
 - `packages/agents`: demo agents, agent loop, LLM interface and cache
-- `apps/api`: FastAPI service (`/health`, `/runs`)
+- `apps/api`: FastAPI service (`/health`, `/runs`, step detail, `/diff`)
+- `apps/web`: Next.js UI over the API
 - `apps/cli`: `agentgit` command
 - `docs/adr`: design decisions; `docs/architecture.md`, `docs/recording-format.md`
 
