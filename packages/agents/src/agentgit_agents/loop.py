@@ -36,6 +36,7 @@ from agentgit_agents.llm import (
     ToolResultBlock,
     ToolSpec,
 )
+from agentgit_core import telemetry
 
 log = logging.getLogger("agentgit.agents")
 
@@ -136,7 +137,8 @@ async def _loop(
             effort=config.effort,
         )
         try:
-            response = await llm.complete(request)
+            with telemetry.span("agent.llm_call", model=config.model):
+                response = await llm.complete(request)
         except LLMError as exc:
             return _result(state, "llm_error", error=str(exc))
         state.steps += 1
@@ -193,7 +195,8 @@ async def _run_tool(
         )
 
     try:
-        result = await asyncio.wait_for(tools.call_tool(name, arguments), config.tool_timeout_s)
+        with telemetry.span("agent.tool_call", tool=name):
+            result = await asyncio.wait_for(tools.call_tool(name, arguments), config.tool_timeout_s)
     except TimeoutError:
         return _fail(
             state, name, arguments, "failed", f"tool timed out after {config.tool_timeout_s}s"
