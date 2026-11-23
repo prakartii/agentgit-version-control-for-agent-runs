@@ -1,0 +1,33 @@
+{
+  "machine": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "3.12.3",
+    "cpu_count": 20
+  },
+  "store": {
+    "objects": 2000,
+    "put_new_per_s": 218,
+    "put_existing_per_s": 9185,
+    "get_per_s": 1853
+  },
+  "replay": {
+    "recorded_steps": 2000,
+    "requests_per_s": 1346
+  },
+  "proxy": {
+    "direct": {
+      "n": 1000,
+      "median_ms": 0.163,
+      "p95_ms": 0.289,
+      "p99_ms": 0.387
+    },
+    "through_proxy": {
+      "n": 1000,
+      "median_ms": 2.787,
+      "p95_ms": 14.257,
+      "p99_ms": 23.662
+    },
+    "added_median_ms": 2.624
+  },
+  "measured_on": "2026-11-23"
+}

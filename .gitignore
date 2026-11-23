@@ -13,3 +13,4 @@ node_modules/
 .next/
 .terraform/
 *.tfstate*
+benchmarks/results/latest.json
