@@ -3,7 +3,7 @@ name = "agentgit-core"
 version = "0.0.0"
 description = "AgentGit object model, hashing and diff"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["opentelemetry-api>=1.27"]
 
 [build-system]
 requires = ["hatchling"]
