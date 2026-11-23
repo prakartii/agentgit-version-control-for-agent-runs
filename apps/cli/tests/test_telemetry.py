@@ -49,3 +49,19 @@ def test_instrumentation_is_harmless_without_an_sdk() -> None:
     telemetry.count_divergence("unexpected_request")
     with telemetry.span("noop"):
         pass
+
+
+def test_the_proxy_correlator_emits_a_span_per_completed_call(spans: InMemorySpanExporter) -> None:
+    from agentgit_proxy.correlator import Correlator
+
+    c = Correlator()
+    request = (
+        b'{"jsonrpc":"2.0","id":1,"method":"tools/call",'
+        b'"params":{"name":"add","arguments":{"a":1}}}'
+    )
+    c.observe("client", request)
+    c.observe("server", b'{"jsonrpc":"2.0","id":1,"result":{"content":[]}}')
+    (span,) = spans.get_finished_spans()
+    assert span.attributes is not None
+    assert span.attributes["mcp.tool"] == "add"
+    assert "arguments" not in str(span.attributes)  # payloads stay out of telemetry

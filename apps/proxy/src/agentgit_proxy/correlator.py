@@ -12,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from agentgit_core import telemetry
 from agentgit_core.objects import StepOutcome
 
 # Who sent the message. In the modern protocol only the client sends requests;
@@ -215,6 +216,16 @@ class Correlator:
         self, pending: _Pending, outcome: StepOutcome, response: Any, now_mono: int | None = None
     ) -> Exchange:
         end = self._mono_ms() if now_mono is None else now_mono
+        duration_ms = max(0, end - pending.started_mono_ms)
+        params = pending.params
+        tool = params.get("name") if isinstance(params, dict) else None
+        telemetry.record_exchange(
+            pending.method,
+            tool if isinstance(tool, str) and pending.method == "tools/call" else None,
+            outcome,
+            pending.started_at_ms,
+            duration_ms,
+        )
         return Exchange(
             seq=pending.seq,
             origin=pending.origin,
@@ -224,7 +235,7 @@ class Correlator:
             response=response,
             events=pending.events,
             started_at_ms=pending.started_at_ms,
-            duration_ms=max(0, end - pending.started_mono_ms),
+            duration_ms=duration_ms,
         )
 
 
