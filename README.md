@@ -39,7 +39,12 @@ Working today:
 - **Web UI** (`apps/web`, Next.js): browse runs, expand steps, and view the diff
   between a run and its fork. Read-only; see ADR-010.
 
-Not built yet: observability and benchmarks, deployment.
+- **Observability and benchmarks**: OpenTelemetry spans and metrics for recorded
+  exchanges, replay divergences and agent model/tool calls (off unless
+  `OTEL_EXPORTER_OTLP_ENDPOINT` or `AGENTGIT_TELEMETRY=console` is set), and a
+  benchmark script with one measured run in `benchmarks/`; see ADR-011.
+
+Not built yet: deployment.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 

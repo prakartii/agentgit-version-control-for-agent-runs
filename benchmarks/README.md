@@ -25,8 +25,9 @@ A single run each, so treat the figures as rough.
   seconds) but is not free, and its tail (p95/p99) is much worse than its median.
   The measured loop uses a server that does no work, so this is the worst case
   for relative overhead.
-- Writing new objects is slow because each is written to a temporary file and
-  moved into place so a crash cannot leave a half-written object. Re-writing
+- Writing new objects is slow, most likely because each one creates a directory,
+  a temporary file and a rename (so a crash cannot leave a half-written object),
+  which is slow on Windows. I have not profiled it. Re-writing
   existing content is fast because the object is detected and skipped, which is
   the common case for repeated tool results.
 - Replay reads each step and its blobs from disk. There is no cache yet.
