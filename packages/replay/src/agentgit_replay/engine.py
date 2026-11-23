@@ -17,6 +17,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
+from agentgit_core import telemetry
 from agentgit_core.hashing import canonical_json
 from agentgit_core.objects import Run, Step, blob_id
 from agentgit_core.repo import Repository
@@ -260,6 +261,7 @@ class ReplayEngine:
         self, kind: DivergenceKind, method: str, tool: str | None, position: int, detail: str
     ) -> None:
         self._divergences.append(Divergence(kind, method, tool, position, detail))
+        telemetry.count_divergence(kind)
 
     def _reply(self, msg_id: Any, step: Step) -> dict[str, Any]:
         if step.outcome == "no_response":

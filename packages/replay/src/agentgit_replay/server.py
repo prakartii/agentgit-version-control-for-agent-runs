@@ -10,6 +10,7 @@ import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
+from agentgit_core import telemetry
 from agentgit_proxy.framing import DEFAULT_MAX_LINE_BYTES, LineSplitter
 from agentgit_replay.engine import PASSTHROUGH, ReplayEngine, ReplayReport
 from agentgit_replay.live import LiveUpstream
@@ -25,7 +26,8 @@ async def _one(
     engine: ReplayEngine, message: dict[str, Any], upstream: LiveUpstream | None
 ) -> list[dict[str, Any]]:
     """Messages to send back for one request: normally 0 or 1; more if live notifications."""
-    reply = engine.handle(message)
+    with telemetry.span("replay.request", method=str(message.get("method"))):
+        reply = engine.handle(message)
     if engine.last_delay_s:
         await asyncio.sleep(engine.last_delay_s)  # chaos: a slow tool
     if reply is PASSTHROUGH:
