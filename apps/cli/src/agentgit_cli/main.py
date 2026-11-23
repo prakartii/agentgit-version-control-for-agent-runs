@@ -1,9 +1,13 @@
+import atexit
+
 import typer
 
 from agentgit_cli.ci.command import register as register_ci
 from agentgit_cli.context import load_services
 from agentgit_cli.record import register as register_record
 from agentgit_cli.replay import register as register_replay
+from agentgit_cli.telemetry import setup as setup_telemetry
+from agentgit_cli.telemetry import shutdown as shutdown_telemetry
 from agentgit_cli.vcs import register as register_vcs
 from agentgit_core import __version__
 from agentgit_core.store import ObjectNotFoundError
@@ -20,6 +24,8 @@ register_ci(app)
 @app.callback()
 def main() -> None:
     """Root group. Without a callback Typer collapses a single command into the root."""
+    if setup_telemetry():  # off unless OTEL_EXPORTER_OTLP_ENDPOINT or AGENTGIT_TELEMETRY is set
+        atexit.register(shutdown_telemetry)
 
 
 @app.command()
