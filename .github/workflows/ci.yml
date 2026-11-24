@@ -55,3 +55,18 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+
+  # Builds both images and starts the whole stack, so a broken Dockerfile or
+  # migration is caught here rather than on someone's machine.
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build --wait
+      - name: Smoke test
+        run: |
+          curl --fail --silent http://localhost:8000/health
+          curl --fail --silent --output /dev/null http://localhost:3000/
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
