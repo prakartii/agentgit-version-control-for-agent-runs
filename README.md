@@ -44,7 +44,10 @@ Working today:
   `OTEL_EXPORTER_OTLP_ENDPOINT` or `AGENTGIT_TELEMETRY=console` is set), and a
   benchmark script with one measured run in `benchmarks/`; see ADR-011.
 
-Not built yet: deployment.
+- **Docker**: images for the API (with migrations) and the UI, and a compose file
+  that starts the whole stack; CI builds it and smoke-tests it on every push.
+
+Not built yet: cloud deployment (Terraform) and an S3 object store; see ADR-012.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
 
@@ -139,8 +142,16 @@ fork edits tool results only. See ADR-007.
 
 ## Web UI
 
+The whole stack in containers (UI on :3000, API on :8000):
+
 ```
-docker compose up -d                       # Postgres
+docker compose up -d --build
+```
+
+Or run the pieces yourself:
+
+```
+docker compose up -d postgres              # Postgres
 uv run uvicorn agentgit_api.main:app       # API on :8000
 cd apps/web && npm install && npm run dev  # UI on :3000
 ```
