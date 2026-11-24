@@ -1,0 +1,25 @@
+# API image: FastAPI service plus the Alembic migrations it needs.
+# Build from the repository root: docker build -f Dockerfile.api -t agentgit-api .
+FROM python:3.12-slim
+
+# uv resolves from the committed lockfile, so the image has exactly the tested versions.
+COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /usr/local/bin/uv
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+COPY packages packages
+COPY apps apps
+# --package installs the API and what it depends on, not the CLI or the agents.
+RUN uv sync --locked --no-dev --package agentgit-api
+ENV PATH="/app/.venv/bin:$PATH" \
+    AGENTGIT_HOME=/data \
+    PYTHONUNBUFFERED=1
+
+# Run as a normal user; /data holds the object store.
+RUN useradd --system --uid 10001 agentgit && mkdir /data && chown agentgit /data
+USER agentgit
+VOLUME /data
+EXPOSE 8000
+
+# Apply migrations, then serve. DATABASE_URL must be set.
+CMD ["sh", "-c", "cd packages/index && alembic upgrade head && cd /app && exec uvicorn agentgit_api.main:app --host 0.0.0.0 --port 8000"]
