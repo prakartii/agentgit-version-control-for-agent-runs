@@ -1,4 +1,6 @@
-# Local dev services. The S3-compatible blob store is deferred to Phase 1. Credentials come from .env (see .env.example).
+# `docker compose up -d postgres` starts only the database (development).
+# `docker compose up -d --build` starts the whole stack: database, API and UI.
+# Credentials come from .env (see .env.example).
 services:
   postgres:
     image: postgres:16
@@ -16,5 +18,37 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentgit}:${POSTGRES_PASSWORD:-agentgit}@postgres:5432/${POSTGRES_DB:-agentgit}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      # A named volume by default. Point AGENTGIT_DATA at a host directory (an
+      # AGENTGIT_HOME) to browse runs recorded on the host.
+      - ${AGENTGIT_DATA:-agentgit-data}:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: apps/web
+    environment:
+      AGENTGIT_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
 volumes:
   pgdata:
+  agentgit-data:
