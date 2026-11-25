@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from agentgit_api.auth import require_token
 from agentgit_api.deps import get_index, get_repo
 from agentgit_core.diff import diff_runs
 from agentgit_core.objects import Step
@@ -14,7 +15,7 @@ from agentgit_core.stats import run_stats
 from agentgit_core.store import ObjectNotFoundError
 from agentgit_index.service import IndexService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_token)])
 
 
 class RunOut(BaseModel):
