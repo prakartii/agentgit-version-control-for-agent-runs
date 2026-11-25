@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getRun, getStep, type RunDetail, type StepFull } from "@/lib/api";
+import { getRun, getStats, getStep, type RunDetail, type Stats, type StepFull } from "@/lib/api";
 import { ErrorBox } from "../../error-box";
 
 function Json({ value }: { value: unknown }) {
@@ -11,8 +11,10 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
   const { id } = await params;
   let run: RunDetail;
   let full: StepFull[];
+  let stats: Stats;
   try {
     run = await getRun(id);
+    stats = await getStats(id);
     // One request per step keeps the API small; runs are tens of steps, not thousands.
     full = await Promise.all(run.steps.map((s) => getStep(id, s.position)));
   } catch (e) {
@@ -35,6 +37,23 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
           {" - "}
           <Link href={`/diff?a=${run.parents[0]}&b=${run.id}`}>see the diff</Link>
         </p>
+      )}
+      <h2>Latency by tool</h2>
+      <table>
+        <thead>
+          <tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Mean ms</th><th>Max ms</th><th>Total ms</th></tr>
+        </thead>
+        <tbody>
+          {stats.tools.map((t) => (
+            <tr key={t.tool}>
+              <td className="mono">{t.tool}</td><td>{t.calls}</td><td>{t.errors}</td>
+              <td>{t.mean_ms}</td><td>{t.max_ms}</td><td>{t.total_ms}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {stats.timed_steps < stats.steps && (
+        <p className="muted">Only {stats.timed_steps} of {stats.steps} steps have timings.</p>
       )}
       <h2>Steps</h2>
       {full.map((s) => (

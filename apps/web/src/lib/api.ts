@@ -50,6 +50,24 @@ export type Diff = {
   steps: StepDiff[];
 };
 
+export type ToolStats = {
+  tool: string;
+  calls: number;
+  errors: number;
+  mean_ms: number;
+  max_ms: number;
+  total_ms: number;
+};
+
+export type Stats = {
+  run_id: string;
+  steps: number;
+  timed_steps: number;
+  total_ms: number;
+  errors: number;
+  tools: ToolStats[];
+};
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -79,3 +97,4 @@ export const getStep = (id: string, position: number) =>
   get<StepFull>(`/runs/${encodeURIComponent(id)}/steps/${position}`);
 export const getDiff = (a: string, b: string) =>
   get<Diff>(`/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+export const getStats = (id: string) => get<Stats>(`/runs/${encodeURIComponent(id)}/stats`);
