@@ -10,6 +10,7 @@ from agentgit_api.deps import get_index, get_repo
 from agentgit_core.diff import diff_runs
 from agentgit_core.objects import Step
 from agentgit_core.repo import Repository
+from agentgit_core.stats import run_stats
 from agentgit_core.store import ObjectNotFoundError
 from agentgit_index.service import IndexService
 
@@ -200,4 +201,51 @@ def diff(
             )
             for s in result.steps[result.common_prefix :]
         ],
+    )
+
+
+class ToolStatsOut(BaseModel):
+    tool: str
+    calls: int
+    errors: int
+    mean_ms: float
+    max_ms: int
+    total_ms: int
+
+
+class StatsOut(BaseModel):
+    run_id: str
+    steps: int
+    timed_steps: int
+    total_ms: int
+    errors: int
+    tools: list[ToolStatsOut]  # slowest first
+
+
+@router.get("/runs/{target}/stats", response_model=StatsOut)
+def get_stats(
+    target: str,
+    index: Annotated[IndexService, Depends(get_index)],
+    repo: Annotated[Repository, Depends(get_repo)],
+) -> StatsOut:
+    """Per-tool latency and failure counts, as ``agentgit stats`` prints them."""
+    stats = run_stats(repo, _resolve(index, target))
+    tools = [
+        ToolStatsOut(
+            tool=name,
+            calls=t.calls,
+            errors=t.errors,
+            mean_ms=round(t.mean_ms, 1),
+            max_ms=t.max_ms,
+            total_ms=t.total_ms,
+        )
+        for name, t in sorted(stats.by_tool.items(), key=lambda kv: -kv[1].total_ms)
+    ]
+    return StatsOut(
+        run_id=stats.run_id,
+        steps=stats.steps,
+        timed_steps=stats.timed_steps,
+        total_ms=stats.total_ms,
+        errors=stats.errors,
+        tools=tools,
     )

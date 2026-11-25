@@ -78,3 +78,26 @@ def test_diff_reports_a_changed_result(api_env: None) -> None:
     assert (change["path"], change["before"], change["after"]) == ("result.v", 1, 2)
     same = TestClient(app).get("/diff", params={"a": "a", "b": "a"}).json()
     assert same["identical"] is True
+
+
+def test_stats_endpoint_groups_latency_by_tool(api_env: None) -> None:
+    from agentgit_core.objects import StepTiming
+
+    repo, index = get_repo(), get_index()
+    a = repo.put_step(Step(method="tools/call", tool_name="read", arguments=repo.put_blob(b"1")))
+    b = repo.put_step(Step(method="tools/call", tool_name="read", arguments=repo.put_blob(b"2")))
+    timings = (
+        StepTiming(started_at_ms=0, duration_ms=10),
+        StepTiming(started_at_ms=1, duration_ms=30),
+    )
+    index.set_ref("s", repo.put_run(Run(steps=(a, b), timings=timings)))
+    body = TestClient(app).get("/runs/s/stats").json()
+    assert (body["steps"], body["total_ms"]) == (2, 40)
+    assert body["tools"][0] == {
+        "tool": "read",
+        "calls": 2,
+        "errors": 0,
+        "mean_ms": 20.0,
+        "max_ms": 30,
+        "total_ms": 40,
+    }
