@@ -19,12 +19,14 @@ from agentgit_cli.replay import resolve_run_id
 from agentgit_core.diff import Change, RunDiff, diff_runs
 from agentgit_core.fork import ForkError, fork_run, parse_json_value
 from agentgit_core.repo import Repository
+from agentgit_core.stats import RunStats, compare, run_stats
 from agentgit_core.store import FilesystemStore, ObjectNotFoundError
 from agentgit_index.service import IndexService
 
 SHORT_ID = 12
 NOT_FOUND_EXIT_CODE = 2
 MAX_VALUE_CHARS = 100
+NL = chr(10)
 
 
 def _say(message: str) -> None:
@@ -220,7 +222,53 @@ def checkout_command(
     _say(f"wrote {len(run.steps)} step(s) to {to}")
 
 
+def _stats_table(stats: RunStats) -> list[str]:
+    lines = [
+        f"run {stats.run_id[:SHORT_ID]}: {stats.steps} steps, "
+        f"{stats.total_ms} ms in calls, {stats.errors} failed"
+    ]
+    if stats.timed_steps < stats.steps:
+        lines.append(f"  only {stats.timed_steps} of {stats.steps} steps have timings")
+    header = f"  {'tool':<24}{'calls':>6}{'errors':>7}{'mean ms':>9}{'max ms':>8}{'total ms':>10}"
+    lines.append(header)
+    for name, t in sorted(stats.by_tool.items(), key=lambda kv: -kv[1].total_ms):
+        lines.append(
+            f"  {name:<24}{t.calls:>6}{t.errors:>7}{t.mean_ms:>9.1f}{t.max_ms:>8}{t.total_ms:>10}"
+        )
+    return lines
+
+
+def stats_command(
+    a: Annotated[str, typer.Argument(help="Run (id, prefix or ref).")],
+    b: Annotated[str | None, typer.Argument(help="Second run to compare against.")] = None,
+) -> None:
+    """Latency and failure counts per tool; with two runs, also the change from A to B."""
+    home, repo = _repo()
+    try:
+        first = run_stats(repo, _resolve(home, repo, a))
+        second = run_stats(repo, _resolve(home, repo, b)) if b else None
+    except ObjectNotFoundError as e:
+        _say(f"object missing from the store: {e}")
+        raise typer.Exit(NOT_FOUND_EXIT_CODE) from None
+    typer.echo(NL.join(_stats_table(first)))
+    if second is None:
+        return
+    typer.echo("")
+    typer.echo(NL.join(_stats_table(second)))
+    delta = compare(first, second)
+    typer.echo("")
+    typer.echo(
+        f"B minus A: {delta.steps:+d} steps, {delta.total_ms:+d} ms, {delta.errors:+d} failed"
+    )
+    for tool in delta.by_tool_ms:
+        if delta.by_tool_ms[tool] or delta.by_tool_calls[tool]:
+            typer.echo(
+                f"  {tool:<24}{delta.by_tool_calls[tool]:+d} calls, {delta.by_tool_ms[tool]:+d} ms"
+            )
+
+
 def register(app: typer.Typer) -> None:
+    app.command("stats")(stats_command)
     app.command("fork")(fork_command)
     app.command("diff")(diff_command)
     app.command("checkout")(checkout_command)

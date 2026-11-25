@@ -106,3 +106,33 @@ def test_result_can_come_from_a_checked_out_file(source: tuple[Path, str], tmp_p
     edit.write_text(json.dumps(EDITED), encoding="utf-8")
     proc = cli(home, "fork", run_id, "--at", "1", "--result-file", str(edit))
     assert proc.returncode == 0, proc.stderr
+
+
+def test_stats_reports_latency_and_compares_two_runs(source: tuple[Path, str]) -> None:
+    from agentgit_core.objects import StepTiming
+
+    home, run_id = source
+    repo = Repository(FilesystemStore(home / "objects"))
+    run = repo.get_run(run_id)
+    timed = [
+        repo.put_run(
+            run.model_copy(
+                update={
+                    "timings": tuple(
+                        StepTiming(started_at_ms=i, duration_ms=ms)
+                        for i, ms in enumerate(durations)
+                    ),
+                    "metadata": {"variant": str(durations[0])},
+                }
+            )
+        )
+        for durations in ([10, 20, 30], [10, 50, 30])
+    ]
+    one = cli(home, "stats", timed[0][:10])
+    assert one.returncode == 0, one.stderr
+    assert "3 steps, 60 ms in calls" in one.stdout and "tool1" in one.stdout
+
+    two = cli(home, "stats", timed[0][:10], timed[1][:10])
+    assert "B minus A: +0 steps, +30 ms, +0 failed" in two.stdout
+    assert "tool1" in two.stdout.split("B minus A")[1]  # only the changed tool is listed
+    assert "tool0" not in two.stdout.split("B minus A")[1]
