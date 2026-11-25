@@ -23,6 +23,8 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
+      # Set AGENTGIT_API_TOKEN in .env to require a bearer token on the API.
+      AGENTGIT_API_TOKEN: ${AGENTGIT_API_TOKEN:-}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentgit}:${POSTGRES_PASSWORD:-agentgit}@postgres:5432/${POSTGRES_DB:-agentgit}
     depends_on:
       postgres:
@@ -43,6 +45,7 @@ services:
     build: apps/web
     environment:
       AGENTGIT_API_URL: http://api:8000
+      AGENTGIT_API_TOKEN: ${AGENTGIT_API_TOKEN:-}
     depends_on:
       api:
         condition: service_healthy
