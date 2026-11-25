@@ -20,5 +20,5 @@ Status: accepted
 - The API container keeps objects in a volume at `/data`. Runs recorded by the
   CLI on a host are visible in the UI only if that directory is mounted
   (`AGENTGIT_DATA`).
-- The API has no authentication. It is read-only and meant for a trusted network
-  or localhost; put it behind an authenticating proxy before exposing it.
+- Authentication is a single optional shared bearer token (`AGENTGIT_API_TOKEN`),
+  not user accounts. Serve over HTTPS before exposing the API beyond localhost.

@@ -47,6 +47,11 @@ Working today:
 - **Docker**: images for the API (with migrations) and the UI, and a compose file
   that starts the whole stack; CI builds it and smoke-tests it on every push.
 
+- **Latency statistics** (`agentgit stats A [B]`, `/runs/{run}/stats`, run page):
+  per-tool calls, failures, mean/max/total time, and the change from one run to another.
+- **Optional API token**: set `AGENTGIT_API_TOKEN` and every endpoint except
+  `/health` requires `Authorization: Bearer <token>`; the UI sends it server-side.
+
 Not built yet: cloud deployment (Terraform) and an S3 object store; see ADR-012.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
@@ -248,7 +253,7 @@ provider has been tested against the SDK's types, not the live API.
 
 - Record: capture agent runs through an MCP proxy, no SDK needed
 - Replay: re-run an agent against recorded tool outputs and detect divergence
-- Diff of cost and latency between runs (steps and payloads are done)
+- Token and cost diff between runs (steps, payloads and latency are done; model usage is not stored in runs)
 
 ## Limitations
 
