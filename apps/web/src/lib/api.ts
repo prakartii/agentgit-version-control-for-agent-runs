@@ -2,6 +2,8 @@
 // calls run on the Next.js server and the browser never talks to the API.
 
 export const API_URL = process.env.AGENTGIT_API_URL ?? "http://localhost:8000";
+// Read on the server only (no NEXT_PUBLIC_ prefix), so it never reaches the browser.
+const TOKEN = process.env.AGENTGIT_API_TOKEN;
 
 export type Run = {
   id: string;
@@ -80,7 +82,10 @@ export class ApiError extends Error {
 async function get<T>(path: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+    response = await fetch(`${API_URL}${path}`, {
+      cache: "no-store",
+      headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
+    });
   } catch {
     throw new ApiError(0, `Cannot reach the AgentGit API at ${API_URL}. Is it running?`);
   }
