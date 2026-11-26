@@ -4,6 +4,7 @@ import typer
 
 from agentgit_cli.ci.command import register as register_ci
 from agentgit_cli.context import load_services
+from agentgit_cli.maintenance import register as register_maintenance
 from agentgit_cli.record import register as register_record
 from agentgit_cli.replay import register as register_replay
 from agentgit_cli.telemetry import setup as setup_telemetry
@@ -19,6 +20,7 @@ register_record(app)
 register_replay(app)
 register_vcs(app)
 register_ci(app)
+register_maintenance(app)
 
 
 @app.callback()
