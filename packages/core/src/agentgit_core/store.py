@@ -6,6 +6,7 @@ content twice is a no-op (deduplication). Backends only need put/get/has.
 
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Protocol
 
@@ -81,3 +82,27 @@ class FilesystemStore:
 
     def has(self, object_type: str, object_id: str) -> bool:
         return self._path(object_type, object_id).exists()
+
+    def iter_ids(self, object_type: str) -> list[str]:
+        """Every stored id of this type. Used by verify and gc, not by normal reads."""
+        base = self._root / object_type
+        if not base.is_dir():
+            return []
+        return sorted(
+            shard.name + f.name
+            for shard in base.iterdir()
+            if shard.is_dir()
+            for f in shard.iterdir()
+            if f.is_file() and not f.name.startswith("tmp")  # skip interrupted writes
+        )
+
+    def age_seconds(self, object_type: str, object_id: str) -> float:
+        """Seconds since the object was written (by file modification time)."""
+        return max(0.0, time.time() - self._path(object_type, object_id).stat().st_mtime)
+
+    def delete(self, object_type: str, object_id: str) -> None:
+        self._path(object_type, object_id).unlink(missing_ok=True)
+
+    def stale_temp_files(self) -> list[Path]:
+        """Leftovers of writes that crashed before the final rename."""
+        return sorted(self._root.glob("*/??/tmp*"))
