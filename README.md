@@ -52,6 +52,11 @@ Working today:
 - **Optional API token**: set `AGENTGIT_API_TOKEN` and every endpoint except
   `/health` requires `Authorization: Bearer <token>`; the UI sends it server-side.
 
+- **Store maintenance**: `agentgit verify` re-hashes every object and checks every
+  reference (exit 1 if damaged); `agentgit gc` reports steps and blobs no run uses
+  and deletes them only with `--delete`. Runs are never deleted, and objects newer
+  than an hour are kept so a live recording is safe.
+
 Not built yet: cloud deployment (Terraform) and an S3 object store; see ADR-012.
 See [docs/architecture.md](docs/architecture.md) for the design and the
 known limitations.
