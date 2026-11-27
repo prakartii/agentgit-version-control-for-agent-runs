@@ -55,6 +55,13 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: apps/web/test-results
 
   # Builds both images and starts the whole stack, so a broken Dockerfile or
   # migration is caught here rather than on someone's machine.
